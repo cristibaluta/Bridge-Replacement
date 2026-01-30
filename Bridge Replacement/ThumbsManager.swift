@@ -1,6 +1,6 @@
 //
 //  ThumbsManager.swift
-//  Imagin Bridge
+//  Bridge Replacement
 //
 //  Created by Cristian Baluta on 30.01.2026.
 //
@@ -19,15 +19,15 @@ class ThumbsManager: ObservableObject {
     // Cache directory
     private let cacheDirectory: URL
 
+    private let thumbSize: CGFloat = 256
+
     private init() {
         // Create cache directory in Application Support
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
-                                                in: .userDomainMask).first!
-        cacheDirectory = appSupport.appendingPathComponent("Imagin Bridge/Thumbnails")
+        let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        cacheDirectory = cachesDir.appendingPathComponent("ro.imagin.Bridge-Replacement/256")
 
         // Create directory if it doesn't exist
-        try? FileManager.default.createDirectory(at: cacheDirectory,
-                                               withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
     }
 
     // MARK: - Public Interface
@@ -87,9 +87,7 @@ class ThumbsManager: ObservableObject {
     // MARK: - Private Methods
 
     private func cacheKey(for path: String) -> String {
-        // Use just the filename (without extension) + .jpg
-        let url = URL(fileURLWithPath: path)
-        return url.deletingPathExtension().lastPathComponent
+        return URL(fileURLWithPath: path).lastPathComponent
     }
 
     private func getCachedImage(for cacheKey: String) -> NSImage? {
@@ -136,8 +134,7 @@ class ThumbsManager: ObservableObject {
             return
         }
 
-        // Resize to 100px on longest side
-        let thumbnail = resizeImage(originalImage, maxSize: 100)
+        let thumbnail = originalImage.resized(maxSize: thumbSize)
 
         // Cache in memory
         setCachedImage(thumbnail, for: cacheKey)
@@ -150,51 +147,29 @@ class ThumbsManager: ObservableObject {
             completion(thumbnail)
         }
     }
-
-    private func resizeImage(_ image: NSImage, maxSize: CGFloat) -> NSImage {
-        let originalSize = image.size
-        let aspectRatio = originalSize.width / originalSize.height
-
-        var newSize: NSSize
-        if originalSize.width > originalSize.height {
-            newSize = NSSize(width: maxSize, height: maxSize / aspectRatio)
-        } else {
-            newSize = NSSize(width: maxSize * aspectRatio, height: maxSize)
-        }
-
-        let newImage = NSImage(size: newSize)
-        newImage.lockFocus()
-        image.draw(in: NSRect(origin: .zero, size: newSize),
-                  from: NSRect(origin: .zero, size: originalSize),
-                  operation: .sourceOver,
-                  fraction: 1.0)
-        newImage.unlockFocus()
-
-        return newImage
-    }
 }
 
 // MARK: - Cache Statistics (for debugging)
-extension ThumbsManager {
-    var memoryCacheCount: Int {
-        return cacheQueue.sync {
-            return memoryCache.count
-        }
-    }
-
-    var diskCacheSize: Int64 {
-        guard let enumerator = FileManager.default.enumerator(at: cacheDirectory,
-                                                            includingPropertiesForKeys: [.fileSizeKey]) else {
-            return 0
-        }
-
-        var totalSize: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            if let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
-               let fileSize = resourceValues.fileSize {
-                totalSize += Int64(fileSize)
-            }
-        }
-        return totalSize
-    }
-}
+//extension ThumbsManager {
+//    var memoryCacheCount: Int {
+//        return cacheQueue.sync {
+//            return memoryCache.count
+//        }
+//    }
+//
+//    var diskCacheSize: Int64 {
+//        guard let enumerator = FileManager.default.enumerator(at: cacheDirectory,
+//                                                              includingPropertiesForKeys: [.fileSizeKey]) else {
+//            return 0
+//        }
+//
+//        var totalSize: Int64 = 0
+//        for case let fileURL as URL in enumerator {
+//            if let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
+//               let fileSize = resourceValues.fileSize {
+//                totalSize += Int64(fileSize)
+//            }
+//        }
+//        return totalSize
+//    }
+//}
