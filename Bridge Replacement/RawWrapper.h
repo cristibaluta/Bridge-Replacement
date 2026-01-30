@@ -11,6 +11,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface RawWrapper : NSObject
 
++ (instancetype)shared;
 - (nullable NSData *)extractEmbeddedJPEG:(NSString *)path;
 
 @end

@@ -55,21 +55,21 @@ struct ThumbCell: View {
         guard !isLoading else { return }
         isLoading = true
 
-        Task.detached(priority: .userInitiated) { @MainActor in
-            if let data = RawWrapper().extractEmbeddedJPEG(path) {
-                // Convert NSData -> Data -> NSImage
-                let swiftData = data as Data
-                if let nsImage = NSImage(data: swiftData) {
-                    await MainActor.run {
+        Task.detached(priority: .userInitiated) {
+            // LibRaw operations now run safely on background thread via serial queue
+            let data = RawWrapper().extractEmbeddedJPEG(self.path)
+
+            // Switch to main actor only for UI updates
+            await MainActor.run {
+                if let data = data {
+                    let swiftData = data as Data
+                    if let nsImage = NSImage(data: swiftData) {
                         self.image = nsImage
-                        self.isLoading = false
+                    } else {
+                        print("Failed to create NSImage from NSData for path: \(self.path)")
                     }
-                } else {
-                    print("Failed to create NSImage from NSData for path: \(path)")
-                    await MainActor.run { self.isLoading = false }
                 }
-            } else {
-                await MainActor.run { self.isLoading = false }
+                self.isLoading = false
             }
         }
     }
