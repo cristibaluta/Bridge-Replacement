@@ -131,40 +131,43 @@ struct ThumbGridView: View {
         let xmpFileName = "\(photoName).xmp"
         let xmpFileURL = photoDirectory.appendingPathComponent(xmpFileName)
 
-        // Read existing XMP file to check current label state
+        var xmpContent: String
         var currentLabel: String? = nil
+
+        // Read existing XMP file if it exists
         if FileManager.default.fileExists(atPath: xmpFileURL.path) {
             do {
-                let existingXmpContent = try String(contentsOf: xmpFileURL, encoding: .utf8)
-                if let existingMetadata = XmpParser.parseMetadata(from: existingXmpContent) {
+                xmpContent = try String(contentsOf: xmpFileURL, encoding: .utf8)
+
+                // Parse existing metadata to get current label
+                if let existingMetadata = XmpParser.parseMetadata(from: xmpContent) {
                     currentLabel = existingMetadata.label
                     print("📖 Read existing XMP: Current label = \(currentLabel ?? "None")")
                 }
+
+                // Toggle the label: if currently "Approved", remove it; otherwise set to "Approved"
+                let newLabel: String? = (currentLabel == "Approved") ? nil : "Approved"
+                let labelAction = (newLabel == "Approved") ? "Setting" : "Removing"
+                print("🔄 \(labelAction) Approved label")
+
+                // Update only the xmp:Label attribute in the existing XMP content
+                xmpContent = updateXmpLabel(in: xmpContent, newLabel: newLabel)
+
             } catch {
                 print("⚠️ Failed to read existing XMP file: \(error)")
+                return
             }
         } else {
             print("📄 No existing XMP file found, will create new one")
-        }
 
-        // Toggle the label: if currently "Approved", remove it; otherwise set to "Approved"
-        let newLabel: String? = (currentLabel == "Approved") ? nil : "Approved"
-        let labelAction = (newLabel == "Approved") ? "Setting" : "Removing"
-        print("🔄 \(labelAction) Approved label")
+            // Create minimal XMP file with Approved label
+            let currentDate = Date()
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+            let currentDateString = dateFormatter.string(from: currentDate)
+            let instanceID = UUID().uuidString.lowercased()
 
-        // Get current date for metadata
-        let currentDate = Date()
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
-        let currentDateString = dateFormatter.string(from: currentDate)
-
-        // Generate unique instance ID
-        let instanceID = UUID().uuidString.lowercased()
-
-        // Create XMP content with or without the label attribute
-        let labelAttribute = newLabel != nil ? "   xmp:Label=\"\(newLabel!)\"\n" : ""
-
-        let xmpContent = """
+            xmpContent = """
 <?xml version="1.0" encoding="UTF-8"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 0000/00/00-00:00:00        ">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -172,7 +175,8 @@ struct ThumbGridView: View {
     xmlns:xmp="http://ns.adobe.com/xap/1.0/"
     xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/"
     xmlns:stEvt="http://ns.adobe.com/xap/1.0/sType/ResourceEvent#"
-\(labelAttribute)   xmp:MetadataDate="\(currentDateString)"
+   xmp:Label="Approved"
+   xmp:MetadataDate="\(currentDateString)"
    xmpMM:InstanceID="xmp.iid:\(instanceID)">
    <xmpMM:History>
     <rdf:Seq>
@@ -188,26 +192,88 @@ struct ThumbGridView: View {
  </rdf:RDF>
 </x:xmpmeta>
 """
+            print("🔄 Setting Approved label")
+        }
 
+        // Save the updated XMP content
         do {
             try xmpContent.write(to: xmpFileURL, atomically: true, encoding: .utf8)
             print("✅ XMP file saved: \(xmpFileName)")
             print("📁 Location: \(photoDirectory.path)")
-            print("🏷️ Label: \(newLabel ?? "None")")
 
-            // Parse the XMP content we just saved
+            // Parse the updated XMP content to get the new metadata
             if let parsedMetadata = XmpParser.parseMetadata(from: xmpContent) {
+                print("🏷️ Label: \(parsedMetadata.label ?? "None")")
                 print("📋 Parsed XMP metadata: Label = \(parsedMetadata.label ?? "None")")
 
                 // Update the photo item with the new XMP metadata
                 updatePhotoWithXmpMetadata(photo: photo, xmpMetadata: parsedMetadata)
             } else {
-                print("⚠️ Failed to parse XMP metadata")
+                print("⚠️ Failed to parse updated XMP metadata")
             }
 
         } catch {
             print("❌ Failed to save XMP file for \(photo.path): \(error)")
         }
+    }
+
+    private func updateXmpLabel(in xmpContent: String, newLabel: String?) -> String {
+        var updatedContent = xmpContent
+
+        // Look for existing xmp:Label attribute in the rdf:Description tag
+        let labelPattern = #"xmp:Label="[^"]*""#
+
+        if let range = updatedContent.range(of: labelPattern, options: .regularExpression) {
+            // Always update the existing xmp:Label attribute value
+            let labelValue = newLabel ?? ""
+            updatedContent.replaceSubrange(range, with: "xmp:Label=\"\(labelValue)\"")
+            if newLabel != nil {
+                print("✏️ Updated xmp:Label to \"\(newLabel!)\"")
+            } else {
+                print("✏️ Updated xmp:Label to empty (none)")
+            }
+        } else if newLabel != nil {
+            // No existing label, add new one with the value
+            let descriptionPattern = #"(<rdf:Description[^>]*)"#
+            if let match = updatedContent.range(of: descriptionPattern, options: .regularExpression) {
+                let insertPosition = updatedContent.index(match.upperBound, offsetBy: 0)
+                let labelAttribute = "\n   xmp:Label=\"\(newLabel!)\""
+                updatedContent.insert(contentsOf: labelAttribute, at: insertPosition)
+                print("➕ Added new xmp:Label=\"\(newLabel!)\" attribute")
+            }
+        } else {
+            // No existing label and we want to set it to "none" - add empty label
+            let descriptionPattern = #"(<rdf:Description[^>]*)"#
+            if let match = updatedContent.range(of: descriptionPattern, options: .regularExpression) {
+                let insertPosition = updatedContent.index(match.upperBound, offsetBy: 0)
+                let labelAttribute = "\n   xmp:Label=\"\""
+                updatedContent.insert(contentsOf: labelAttribute, at: insertPosition)
+                print("➕ Added new xmp:Label=\"\" attribute (none)")
+            }
+        }
+
+        // Update the MetadataDate
+        let currentDate = Date()
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        let currentDateString = dateFormatter.string(from: currentDate)
+
+        let metadataDatePattern = #"xmp:MetadataDate="[^"]*""#
+        if let range = updatedContent.range(of: metadataDatePattern, options: .regularExpression) {
+            updatedContent.replaceSubrange(range, with: "xmp:MetadataDate=\"\(currentDateString)\"")
+            print("📅 Updated MetadataDate")
+        } else {
+            // If no MetadataDate exists, add it
+            let descriptionPattern = #"(<rdf:Description[^>]*)"#
+            if let match = updatedContent.range(of: descriptionPattern, options: .regularExpression) {
+                let insertPosition = updatedContent.index(match.upperBound, offsetBy: 0)
+                let metadataAttribute = "\n   xmp:MetadataDate=\"\(currentDateString)\""
+                updatedContent.insert(contentsOf: metadataAttribute, at: insertPosition)
+                print("📅 Added MetadataDate")
+            }
+        }
+
+        return updatedContent
     }
 
     private func updatePhotoWithXmpMetadata(photo: PhotoItem, xmpMetadata: XmpMetadata) {
