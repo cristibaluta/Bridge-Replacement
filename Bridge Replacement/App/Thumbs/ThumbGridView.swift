@@ -7,24 +7,49 @@ struct ThumbGridView: View {
     @State private var lastScrolledRow: Int = -1
     @State private var showFilterPopover = false
     @State private var selectedLabels: Set<String> = []
+    @State private var showSortPopover = false
+    @State private var sortOption: SortOption = .name
+    @State private var sortAscending = true
 
-    // Computed property for filtered photos
+    enum SortOption: String, CaseIterable {
+        case name = "Name"
+        case dateCreated = "Date Created"
+    }
+
+    // Computed property for filtered and sorted photos
     private var filteredPhotos: [PhotoItem] {
-        if selectedLabels.isEmpty {
-            return photos
-        }
+        var result = photos
 
-        return photos.filter { photo in
-            let photoLabel = photo.xmp?.label ?? ""
+        // Apply filtering
+        if !selectedLabels.isEmpty {
+            result = result.filter { photo in
+                let photoLabel = photo.xmp?.label ?? ""
 
-            // Handle "No Label" filter
-            if selectedLabels.contains("No Label") && photoLabel.isEmpty {
-                return true
+                // Handle "No Label" filter
+                if selectedLabels.contains("No Label") && photoLabel.isEmpty {
+                    return true
+                }
+
+                // Handle other specific labels
+                return selectedLabels.contains(photoLabel)
             }
-
-            // Handle other specific labels
-            return selectedLabels.contains(photoLabel)
         }
+
+        // Apply sorting
+        switch sortOption {
+        case .name:
+            result = result.sorted { photo1, photo2 in
+                let name1 = URL(fileURLWithPath: photo1.path).lastPathComponent
+                let name2 = URL(fileURLWithPath: photo2.path).lastPathComponent
+                return sortAscending ? name1 < name2 : name1 > name2
+            }
+        case .dateCreated:
+            result = result.sorted { photo1, photo2 in
+                return sortAscending ? photo1.dateCreated < photo2.dateCreated : photo1.dateCreated > photo2.dateCreated
+            }
+        }
+
+        return result
     }
 
     let columns = [
@@ -74,7 +99,7 @@ struct ThumbGridView: View {
                 }
             }
 
-            // Filter bar
+            // Filter and Sort bar
             HStack {
                 Button("Filter") {
                     showFilterPopover.toggle()
@@ -83,6 +108,15 @@ struct ThumbGridView: View {
                 .padding(8)
                 .popover(isPresented: $showFilterPopover) {
                     FilterPopoverView(selectedLabels: $selectedLabels)
+                }
+
+                Button("Sort") {
+                    showSortPopover.toggle()
+                }
+                .font(.caption)
+                .padding(8)
+                .popover(isPresented: $showSortPopover) {
+                    SortPopoverView(sortOption: $sortOption, sortAscending: $sortAscending)
                 }
 
                 Spacer()
@@ -318,8 +352,8 @@ struct ThumbGridView: View {
     private func updatePhotoWithXmpMetadata(photo: PhotoItem, xmpMetadata: XmpMetadata) {
         // Find the current photo index in the model's photos array
         if let photoIndex = model.photos.firstIndex(where: { $0.path == photo.path }) {
-            // Create a new PhotoItem with the updated XMP metadata but preserve the original ID
-            let updatedPhoto = PhotoItem(id: photo.id, path: photo.path, xmp: xmpMetadata)
+            // Create a new PhotoItem with the updated XMP metadata but preserve the original ID and dateCreated
+            let updatedPhoto = PhotoItem(id: photo.id, path: photo.path, xmp: xmpMetadata, dateCreated: photo.dateCreated)
 
             // Update the photos array directly (since BrowserModel is @Published)
             model.photos[photoIndex] = updatedPhoto
