@@ -27,9 +27,6 @@ struct ThumbCell: View {
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                } else if isLoading {
-                    ProgressView()
-                        .scaleEffect(0.5)
                 } else {
                     Image(systemName: "photo")
                         .foregroundColor(.gray)
