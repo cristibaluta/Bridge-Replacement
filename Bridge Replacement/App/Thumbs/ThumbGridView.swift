@@ -9,7 +9,8 @@ struct ThumbGridView: View {
     @State private var selectedLabels: Set<String> = []
     @State private var showSortPopover = false
     @State private var sortOption: SortOption = .name
-    @State private var sortAscending = true
+
+    private let sortOptionKey = "SelectedSortOption"
 
     enum SortOption: String, CaseIterable {
         case name = "Name"
@@ -35,17 +36,17 @@ struct ThumbGridView: View {
             }
         }
 
-        // Apply sorting
+        // Apply sorting (always ascending)
         switch sortOption {
         case .name:
             result = result.sorted { photo1, photo2 in
                 let name1 = URL(fileURLWithPath: photo1.path).lastPathComponent
                 let name2 = URL(fileURLWithPath: photo2.path).lastPathComponent
-                return sortAscending ? name1 < name2 : name1 > name2
+                return name1 < name2
             }
         case .dateCreated:
             result = result.sorted { photo1, photo2 in
-                return sortAscending ? photo1.dateCreated < photo2.dateCreated : photo1.dateCreated > photo2.dateCreated
+                return photo1.dateCreated < photo2.dateCreated
             }
         }
 
@@ -90,6 +91,7 @@ struct ThumbGridView: View {
                         if model.selectedPhoto == nil && !filteredPhotos.isEmpty {
                             model.selectedPhoto = filteredPhotos.first
                         }
+                        loadSortOption() // Load the saved sort option
                     }
                     .onChange(of: photos) { _, newPhotos in
                         if !newPhotos.isEmpty {
@@ -101,22 +103,45 @@ struct ThumbGridView: View {
 
             // Filter and Sort bar
             HStack {
-                Button("Filter") {
+                Button(action: {
                     showFilterPopover.toggle()
+                }) {
+                    Text("Filter")
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray, lineWidth: 1)
+                        )
                 }
-                .font(.caption)
-                .padding(8)
+                .buttonStyle(PlainButtonStyle())
                 .popover(isPresented: $showFilterPopover) {
                     FilterPopoverView(selectedLabels: $selectedLabels)
                 }
 
-                Button("Sort") {
+                Button(action: {
                     showSortPopover.toggle()
+                }) {
+                    Text("Sort")
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray, lineWidth: 1)
+                        )
                 }
-                .font(.caption)
-                .padding(8)
+                .buttonStyle(PlainButtonStyle())
                 .popover(isPresented: $showSortPopover) {
-                    SortPopoverView(sortOption: $sortOption, sortAscending: $sortAscending)
+                    SortPopoverView(sortOption: $sortOption)
+                }
+                .onChange(of: sortOption) { _, newValue in
+                    saveSortOption(newValue)
                 }
 
                 Spacer()
@@ -403,6 +428,17 @@ struct ThumbGridView: View {
         } catch {
             print("Failed to open \(url.lastPathComponent) with \(app.displayName): \(error)")
             return false
+        }
+    }
+
+    private func saveSortOption(_ option: SortOption) {
+        UserDefaults.standard.set(option.rawValue, forKey: sortOptionKey)
+    }
+
+    private func loadSortOption() {
+        if let savedOption = UserDefaults.standard.string(forKey: sortOptionKey),
+           let option = SortOption(rawValue: savedOption) {
+            sortOption = option
         }
     }
 }
