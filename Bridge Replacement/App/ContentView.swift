@@ -202,10 +202,10 @@ struct ContentView: View {
 
             // Keywords to identify photo editing applications
             let photoKeywords = [
-                "photo", "lightroom", "photoshop", "After-Effects", "Premiere-Pro",
+                "lightroom", "photoshop", "After-Effects", "Premiere-Pro",
                 "com.dxo", "captureone", "photoraw",
                 ".luminar", "affinity", "pixelmator", "gimp", "sketch", "canva",
-                "adobe", ".on1.", "topaz", "nik", "hdr", "panorama", "preview"
+                ".on1.", "topaz", "nik", "hdr", "panorama", "preview"
             ]
 
             var apps: [PhotoApp] = []
