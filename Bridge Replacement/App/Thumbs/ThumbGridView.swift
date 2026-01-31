@@ -5,6 +5,19 @@ struct ThumbGridView: View {
     @ObservedObject var model: BrowserModel
     @FocusState private var isFocused: Bool
     @State private var lastScrolledRow: Int = -1
+    @State private var showFilterPopover = false
+    @State private var showApprovedOnly = false
+
+    // Computed property for filtered photos
+    private var filteredPhotos: [PhotoItem] {
+        if showApprovedOnly {
+            return photos.filter { photo in
+                photo.xmp?.label == "Approved"
+            }
+        } else {
+            return photos
+        }
+    }
 
     let columns = [
         GridItem(.fixed(108), spacing: 8),
@@ -14,41 +27,67 @@ struct ThumbGridView: View {
     private let columnsCount = 3
 
     var body: some View {
-        ScrollViewReader { proxy in
-            GeometryReader { geometry in
-                ScrollView(.vertical, showsIndicators: true) {
-                    LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(photos, id: \.id) { photo in
-                            ThumbCell(photo: photo, isSelected: model.selectedPhoto?.id == photo.id)
-                                .frame(width: 100, height: 150)
-                                .id(photo.id)
-                                .onTapGesture {
-                                    model.selectedPhoto = photo
-                                }
+        VStack(spacing: 0) {
+            // Main thumbnail grid
+            ScrollViewReader { proxy in
+                GeometryReader { geometry in
+                    ScrollView(.vertical, showsIndicators: true) {
+                        LazyVGrid(columns: columns, spacing: 8) {
+                            ForEach(filteredPhotos, id: \.id) { photo in
+                                ThumbCell(photo: photo, isSelected: model.selectedPhoto?.id == photo.id)
+                                    .frame(width: 100, height: 150)
+                                    .id(photo.id)
+                                    .onTapGesture {
+                                        model.selectedPhoto = photo
+                                    }
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 4)
+                    }
+                    .scrollContentBackground(.hidden)
+                    .focusable()
+                    .focusEffectDisabled()
+                    .focused($isFocused)
+                    .onKeyPress { keyPress in
+                        handleKeyPress(keyPress, proxy: proxy, viewportHeight: geometry.size.height)
+                    }
+                    .onAppear {
+                        isFocused = true
+                        if model.selectedPhoto == nil && !filteredPhotos.isEmpty {
+                            model.selectedPhoto = filteredPhotos.first
                         }
                     }
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 4)
-                }
-                .scrollContentBackground(.hidden)
-                .focusable()
-                .focusEffectDisabled()
-                .focused($isFocused)
-                .onKeyPress { keyPress in
-                    handleKeyPress(keyPress, proxy: proxy, viewportHeight: geometry.size.height)
-                }
-                .onAppear {
-                    isFocused = true
-                    if model.selectedPhoto == nil && !photos.isEmpty {
-                        model.selectedPhoto = photos.first
-                    }
-                }
-                .onChange(of: photos) { _, newPhotos in
-                    if !newPhotos.isEmpty {
-                        model.selectedPhoto = newPhotos.first
+                    .onChange(of: photos) { _, newPhotos in
+                        if !newPhotos.isEmpty {
+                            model.selectedPhoto = newPhotos.first
+                        }
                     }
                 }
             }
+
+            // Filter bar
+            HStack {
+                Button("Filter") {
+                    showFilterPopover.toggle()
+                }
+                .font(.caption)
+                .padding(8)
+                .popover(isPresented: $showFilterPopover) {
+                    FilterPopoverView(showApprovedOnly: $showApprovedOnly)
+                }
+
+                Spacer()
+
+                if showApprovedOnly {
+                    Text("\(filteredPhotos.count) of \(photos.count) photos")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color(NSColor.controlBackgroundColor))
         }
     }
 
