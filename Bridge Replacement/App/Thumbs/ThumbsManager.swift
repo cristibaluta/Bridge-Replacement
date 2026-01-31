@@ -7,6 +7,7 @@
 
 import Foundation
 import AppKit
+import CryptoKit
 
 class ThumbsManager: ObservableObject {
     static let shared = ThumbsManager()
@@ -97,10 +98,16 @@ class ThumbsManager: ObservableObject {
 
         // Create folder name: originalFolderName_hash
         let lastComponent = url.deletingLastPathComponent().lastPathComponent
-        let directoryHash = abs(directoryPath.hashValue)
+        let directoryHash = persistentHash(for: directoryPath)
         let safeFolderName = "\(lastComponent)_\(directoryHash)"
 
         return cacheDirectory.appendingPathComponent(safeFolderName)
+    }
+
+    private func persistentHash(for string: String) -> String {
+        let data = Data(string.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined().prefix(8).description
     }
 
     private func getCachedImage(for cacheKey: String) -> NSImage? {
