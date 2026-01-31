@@ -114,6 +114,39 @@ struct ThumbGridView: View {
 
         return .ignored
     }
+
+    private func openInExternalApp(photo: PhotoItem) {
+        let url = URL(fileURLWithPath: photo.path)
+
+        // TODO: This will be configurable from UI later
+        let preferredApp = ExternalApp.photoshop
+
+        if openWithSpecificApp(url: url, app: preferredApp) {
+            print("Opening \(url.lastPathComponent) in \(preferredApp.displayName)")
+        } else {
+            // Fallback to default application
+            NSWorkspace.shared.open(url)
+            print("Opening \(url.lastPathComponent) in default app")
+        }
+    }
+
+    private func openWithSpecificApp(url: URL, app: ExternalApp) -> Bool {
+        let workspace = NSWorkspace.shared
+
+        // Try to find the application bundle
+        guard let appURL = workspace.urlForApplication(withBundleIdentifier: app.bundleID) else {
+            print("App \(app.displayName) not found (Bundle ID: \(app.bundleID))")
+            return false
+        }
+
+        do {
+            try workspace.open([url], withApplicationAt: appURL, options: [], configuration: [:])
+            return true
+        } catch {
+            print("Failed to open \(url.lastPathComponent) with \(app.displayName): \(error)")
+            return false
+        }
+    }
 }
 
 struct ViewOffsetKey: PreferenceKey {
