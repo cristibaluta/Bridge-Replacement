@@ -69,6 +69,15 @@ struct ThumbGridView: View {
         case .downArrow:
             newIndex = min(photos.count - 1, currentIndex + columnsCount)
         default:
+            // Check for Command+8 shortcut
+            if keyPress.characters == "8" || (keyPress.characters == "8" && keyPress.modifiers.contains(.command)) {
+                if let selectedPhoto = model.selectedPhoto {
+                    createAndSaveXmpFile(for: selectedPhoto)
+                } else {
+                    print("DEBUG: No photo selected")
+                }
+                return .handled
+            }
             return .ignored
         }
 
@@ -113,6 +122,92 @@ struct ThumbGridView: View {
         }
 
         return .ignored
+    }
+
+    private func createAndSaveXmpFile(for photo: PhotoItem) {
+        let photoURL = URL(fileURLWithPath: photo.path)
+        let photoDirectory = photoURL.deletingLastPathComponent()
+        let photoName = photoURL.deletingPathExtension().lastPathComponent
+        let xmpFileName = "\(photoName).xmp"
+        let xmpFileURL = photoDirectory.appendingPathComponent(xmpFileName)
+
+        // Get current date for metadata
+        let currentDate = Date()
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        let currentDateString = dateFormatter.string(from: currentDate)
+
+        // Generate unique instance ID
+        let instanceID = UUID().uuidString.lowercased()
+
+        let xmpContent = """
+<?xml version="1.0" encoding="UTF-8"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 0000/00/00-00:00:00        ">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+    xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/"
+    xmlns:stEvt="http://ns.adobe.com/xap/1.0/sType/ResourceEvent#"
+   xmp:Label="Approved"
+   xmp:MetadataDate="\(currentDateString)"
+   xmpMM:InstanceID="xmp.iid:\(instanceID)">
+   <xmpMM:History>
+    <rdf:Seq>
+     <rdf:li
+      stEvt:action="saved"
+      stEvt:instanceID="xmp.iid:\(instanceID)"
+      stEvt:when="\(currentDateString)"
+      stEvt:softwareAgent="Bridge Replacement"
+      stEvt:changed="/metadata"/>
+    </rdf:Seq>
+   </xmpMM:History>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+"""
+
+        do {
+            try xmpContent.write(to: xmpFileURL, atomically: true, encoding: .utf8)
+            print("✅ XMP file created: \(xmpFileName)")
+            print("📁 Location: \(photoDirectory.path)")
+            print("🏷️ Label: Approved")
+
+            // Parse the XMP content we just saved
+            if let parsedMetadata = XmpParser.parseMetadata(from: xmpContent) {
+                print("📋 Parsed XMP metadata: Label = \(parsedMetadata.label ?? "None")")
+
+                // Update the photo item with the new XMP metadata
+                updatePhotoWithXmpMetadata(photo: photo, xmpMetadata: parsedMetadata)
+            } else {
+                print("⚠️ Failed to parse XMP metadata")
+            }
+
+        } catch {
+            print("❌ Failed to create XMP file for \(photo.path): \(error)")
+        }
+    }
+
+    private func updatePhotoWithXmpMetadata(photo: PhotoItem, xmpMetadata: XmpMetadata) {
+        // Find the current photo index in the model's photos array
+        if let photoIndex = model.photos.firstIndex(where: { $0.path == photo.path }) {
+            // Create a new PhotoItem with the updated XMP metadata
+            let updatedPhoto = PhotoItem(path: photo.path, xmp: xmpMetadata)
+
+            // Update the photos array directly (since BrowserModel is @Published)
+            model.photos[photoIndex] = updatedPhoto
+
+            // Update selectedPhoto if it's the one being modified
+            if model.selectedPhoto?.path == photo.path {
+                model.selectedPhoto = updatedPhoto
+            }
+
+            print("🔄 PhotoItem updated in model with XMP metadata")
+            print("   Path: \(photo.path)")
+            print("   Label: \(xmpMetadata.label ?? "None")")
+            print("   Index: \(photoIndex)")
+        } else {
+            print("⚠️ Photo not found in model: \(photo.path)")
+        }
     }
 
     private func openInExternalApp(photo: PhotoItem) {

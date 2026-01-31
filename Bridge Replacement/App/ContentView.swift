@@ -84,7 +84,7 @@ struct ContentView: View {
                     .help("Select Folder")
                     .popover(isPresented: $showFolderPopover) {
                         FolderSelectionPopoverView(model: model)
-                            .frame(width: 300, height: 400)
+                            .frame(width: 300, height: 500)
                     }
                 }
             }
