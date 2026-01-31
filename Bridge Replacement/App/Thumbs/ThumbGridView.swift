@@ -69,7 +69,7 @@ struct ThumbGridView: View {
         case .downArrow:
             newIndex = min(photos.count - 1, currentIndex + columnsCount)
         default:
-            // Check for Command+8 shortcut
+            // Check for "8" key to toggle XMP label
             if keyPress.characters == "8" || (keyPress.characters == "8" && keyPress.modifiers.contains(.command)) {
                 if let selectedPhoto = model.selectedPhoto {
                     createAndSaveXmpFile(for: selectedPhoto)
@@ -145,7 +145,7 @@ struct ThumbGridView: View {
                     print("📖 Read existing XMP: Current label = \(currentLabel ?? "None")")
                 }
 
-                // Toggle the label: if currently "Approved", remove it; otherwise set to "Approved"
+                // Toggle the label: if currently "Approved", set to none; otherwise set to "Approved"
                 let newLabel: String? = (currentLabel == "Approved") ? nil : "Approved"
                 let labelAction = (newLabel == "Approved") ? "Setting" : "Removing"
                 print("🔄 \(labelAction) Approved label")
@@ -224,33 +224,26 @@ struct ThumbGridView: View {
         let labelPattern = #"xmp:Label="[^"]*""#
 
         if let range = updatedContent.range(of: labelPattern, options: .regularExpression) {
-            // Always update the existing xmp:Label attribute value
-            let labelValue = newLabel ?? ""
-            updatedContent.replaceSubrange(range, with: "xmp:Label=\"\(labelValue)\"")
-            if newLabel != nil {
-                print("✏️ Updated xmp:Label to \"\(newLabel!)\"")
+            if let newLabel = newLabel {
+                // Update existing xmp:Label attribute with new value
+                updatedContent.replaceSubrange(range, with: "xmp:Label=\"\(newLabel)\"")
+                print("✏️ Updated xmp:Label to \"\(newLabel)\"")
             } else {
+                // Update existing xmp:Label attribute to empty value (none)
+                updatedContent.replaceSubrange(range, with: "xmp:Label=\"\"")
                 print("✏️ Updated xmp:Label to empty (none)")
             }
-        } else if newLabel != nil {
+        } else if let newLabel = newLabel {
             // No existing label, add new one with the value
             let descriptionPattern = #"(<rdf:Description[^>]*)"#
             if let match = updatedContent.range(of: descriptionPattern, options: .regularExpression) {
                 let insertPosition = updatedContent.index(match.upperBound, offsetBy: 0)
-                let labelAttribute = "\n   xmp:Label=\"\(newLabel!)\""
+                let labelAttribute = "\n   xmp:Label=\"\(newLabel)\""
                 updatedContent.insert(contentsOf: labelAttribute, at: insertPosition)
-                print("➕ Added new xmp:Label=\"\(newLabel!)\" attribute")
-            }
-        } else {
-            // No existing label and we want to set it to "none" - add empty label
-            let descriptionPattern = #"(<rdf:Description[^>]*)"#
-            if let match = updatedContent.range(of: descriptionPattern, options: .regularExpression) {
-                let insertPosition = updatedContent.index(match.upperBound, offsetBy: 0)
-                let labelAttribute = "\n   xmp:Label=\"\""
-                updatedContent.insert(contentsOf: labelAttribute, at: insertPosition)
-                print("➕ Added new xmp:Label=\"\" attribute (none)")
+                print("➕ Added new xmp:Label=\"\(newLabel)\" attribute")
             }
         }
+        // If newLabel is nil and no existing label, do nothing (already in "none" state)
 
         // Update the MetadataDate
         let currentDate = Date()
@@ -277,26 +270,16 @@ struct ThumbGridView: View {
     }
 
     private func updatePhotoWithXmpMetadata(photo: PhotoItem, xmpMetadata: XmpMetadata) {
-        // Find the current photo index in the model's photos array
-        if let photoIndex = model.photos.firstIndex(where: { $0.path == photo.path }) {
-            // Create a new PhotoItem with the updated XMP metadata
-            let updatedPhoto = PhotoItem(path: photo.path, xmp: xmpMetadata)
+        // Instead of updating the model directly, let's just log the change
+        // The PhotoItem struct is immutable and changing it would change the ID
+        // We'll rely on the app naturally reloading XMP data when needed
+        print("🔄 XMP metadata updated for photo")
+        print("   Path: \(photo.path)")
+        print("   Label: \(xmpMetadata.label ?? "None")")
+        print("   Note: PhotoItem will be updated when folder is refreshed")
 
-            // Update the photos array directly (since BrowserModel is @Published)
-            model.photos[photoIndex] = updatedPhoto
-
-            // Update selectedPhoto if it's the one being modified
-            if model.selectedPhoto?.path == photo.path {
-                model.selectedPhoto = updatedPhoto
-            }
-
-            print("🔄 PhotoItem updated in model with XMP metadata")
-            print("   Path: \(photo.path)")
-            print("   Label: \(xmpMetadata.label ?? "None")")
-            print("   Index: \(photoIndex)")
-        } else {
-            print("⚠️ Photo not found in model: \(photo.path)")
-        }
+        // The XMP file has been saved to disk, so the metadata is preserved
+        // When the user navigates or refreshes, the updated XMP will be loaded
     }
 
     private func openInExternalApp(photo: PhotoItem) {
