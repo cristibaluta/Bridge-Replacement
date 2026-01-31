@@ -13,8 +13,8 @@ class ThumbsManager: ObservableObject {
 
     // Memory cache for loaded thumbnails
     private var memoryCache: [String: NSImage] = [:]
-    private let cacheQueue = DispatchQueue(label: "com.imagin.thumbs.cache", attributes: .concurrent)
-    private let diskQueue = DispatchQueue(label: "com.imagin.thumbs.disk", qos: .userInitiated)
+    private let cacheQueue = DispatchQueue(label: "ro.imagin.thumbs.cache", attributes: .concurrent)
+    private let diskQueue = DispatchQueue(label: "r.imagin.thumbs.disk", qos: .userInitiated)
 
     // Cache directory
     private let cacheDirectory: URL
@@ -48,7 +48,7 @@ class ThumbsManager: ObservableObject {
         // 2. Check disk cache
         diskQueue.async { [weak self] in
             guard let self = self else { return }
-            
+
             if let diskImage = self.loadFromDisk(cacheKey: cacheKey) {
                 self.setCachedImage(diskImage, for: cacheKey)
                 DispatchQueue.main.async {
@@ -124,17 +124,41 @@ class ThumbsManager: ObservableObject {
     }
 
     private func generateThumbnail(for path: String, cacheKey: String, completion: @escaping (NSImage?) -> Void) {
-        // Generate thumbnail from RAW file
-        print("Generate thumbnail for: \(path)")
-        guard let data = RawWrapper.shared().extractEmbeddedJPEG(path),
-              let originalImage = NSImage(data: data) else {
+        let url = URL(fileURLWithPath: path)
+        let fileExtension = url.pathExtension.lowercased()
+
+        // Define RAW file extensions
+        let rawExtensions = ["arw", "orf", "rw2", "cr2", "cr3", "crw", "nef", "nrw",
+                           "srf", "sr2", "raw", "raf", "pef", "ptx", "dng", "3fr",
+                           "fff", "iiq", "mef", "mos", "x3f", "srw", "dcr", "kdc",
+                           "k25", "kc2", "mrw", "erf", "bay", "ndd", "sti", "rwl", "r3d"]
+
+        var originalImage: NSImage?
+
+        if rawExtensions.contains(fileExtension) {
+            // Generate thumbnail from RAW file using RawWrapper
+            print("Generate RAW thumbnail for: \(path)")
+            guard let data = RawWrapper.shared().extractEmbeddedJPEG(path) else {
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
+                return
+            }
+            originalImage = NSImage(data: data)
+        } else {
+            // Load regular image file directly from disk
+            print("Generate thumbnail for image file: \(path)")
+            originalImage = NSImage(contentsOfFile: path)
+        }
+
+        guard let image = originalImage else {
             DispatchQueue.main.async {
                 completion(nil)
             }
             return
         }
 
-        let thumbnail = originalImage.resized(maxSize: thumbSize)
+        let thumbnail = image.resized(maxSize: thumbSize)
 
         // Cache in memory
         setCachedImage(thumbnail, for: cacheKey)

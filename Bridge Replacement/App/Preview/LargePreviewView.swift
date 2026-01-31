@@ -10,29 +10,68 @@ import SwiftUI
 struct LargePreviewView: View {
     let photo: PhotoItem
     @State private var preview: NSImage?
+    @State private var isLoading = false
 
     var body: some View {
         VStack {
-//            Text(photo.path)
             if let nsImage = preview {
                 Image(nsImage: nsImage)
                     .resizable()
                     .scaledToFit()
                     .padding()
+            } else if isLoading {
+                ProgressView("Loading...")
+                    .progressViewStyle(CircularProgressViewStyle())
             } else {
-                ProgressView()
-                    .onAppear() {
-                        DispatchQueue.main.async {
-                            if let data = RawWrapper().extractEmbeddedJPEG(self.photo.path) {
-                                let img = NSImage(data: data)
-                                DispatchQueue.main.async {
-                                    self.preview = img
-                                }
-                            }
-                        }
-                    }
+                Text("Failed to load image")
+                    .foregroundColor(.secondary)
             }
         }
-//        .background(Rectangle().fill(Color.black).opacity(0.8))
+        .onAppear {
+            loadPreview()
+        }
+        .onChange(of: photo) { _, _ in
+            loadPreview()
+        }
+    }
+
+    private func loadPreview() {
+        guard preview == nil else { return }
+
+        isLoading = true
+
+        Task.detached(priority: .userInitiated) {
+            let loadedImage = await loadImage(from: photo.path)
+
+            await MainActor.run {
+                self.preview = loadedImage
+                self.isLoading = false
+            }
+        }
+    }
+
+    private func loadImage(from path: String) async -> NSImage? {
+        let url = URL(fileURLWithPath: path)
+        let fileExtension = url.pathExtension.lowercased()
+
+        // Define RAW file extensions
+        let rawExtensions = ["arw", "orf", "rw2", "cr2", "cr3", "crw", "nef", "nrw",
+                           "srf", "sr2", "raw", "raf", "pef", "ptx", "dng", "3fr",
+                           "fff", "iiq", "mef", "mos", "x3f", "srw", "dcr", "kdc",
+                           "k25", "kc2", "mrw", "erf", "bay", "ndd", "sti", "rwl", "r3d"]
+
+        if rawExtensions.contains(fileExtension) {
+            // Load RAW file using RawWrapper
+            print("Loading RAW preview for: \(path)")
+            guard let data = RawWrapper.shared().extractEmbeddedJPEG(path) else {
+                print("Failed to extract embedded JPEG from RAW file: \(path)")
+                return nil
+            }
+            return NSImage(data: data)
+        } else {
+            // Load regular image file directly from disk
+            print("Loading image preview for: \(path)")
+            return NSImage(contentsOfFile: path)
+        }
     }
 }
