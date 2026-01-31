@@ -6,16 +6,24 @@ struct ThumbGridView: View {
     @FocusState private var isFocused: Bool
     @State private var lastScrolledRow: Int = -1
     @State private var showFilterPopover = false
-    @State private var showApprovedOnly = false
+    @State private var selectedLabels: Set<String> = []
 
     // Computed property for filtered photos
     private var filteredPhotos: [PhotoItem] {
-        if showApprovedOnly {
-            return photos.filter { photo in
-                photo.xmp?.label == "Approved"
-            }
-        } else {
+        if selectedLabels.isEmpty {
             return photos
+        }
+
+        return photos.filter { photo in
+            let photoLabel = photo.xmp?.label ?? ""
+
+            // Handle "No Label" filter
+            if selectedLabels.contains("No Label") && photoLabel.isEmpty {
+                return true
+            }
+
+            // Handle other specific labels
+            return selectedLabels.contains(photoLabel)
         }
     }
 
@@ -74,12 +82,12 @@ struct ThumbGridView: View {
                 .font(.caption)
                 .padding(8)
                 .popover(isPresented: $showFilterPopover) {
-                    FilterPopoverView(showApprovedOnly: $showApprovedOnly)
+                    FilterPopoverView(selectedLabels: $selectedLabels)
                 }
 
                 Spacer()
 
-                if showApprovedOnly {
+                if !selectedLabels.isEmpty {
                     Text("\(filteredPhotos.count) of \(photos.count) photos")
                         .font(.caption)
                         .foregroundColor(.secondary)

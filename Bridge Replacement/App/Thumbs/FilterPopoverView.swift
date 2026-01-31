@@ -8,21 +8,35 @@
 import SwiftUI
 
 struct FilterPopoverView: View {
-    @Binding var showApprovedOnly: Bool
+    @Binding var selectedLabels: Set<String>
+    
+    // All available labels in the requested order
+    private let availableLabels = ["No Label", "Select", "Second", "Approved", "Review", "To Do"]
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Filter by Labels")
                 .font(.headline)
                 .padding(.bottom, 4)
             
-            Toggle(isOn: $showApprovedOnly) {
-                Text("Approved")
+            ForEach(availableLabels, id: \.self) { label in
+                Toggle(isOn: Binding(
+                    get: { selectedLabels.contains(label) },
+                    set: { isSelected in
+                        if isSelected {
+                            selectedLabels.insert(label)
+                        } else {
+                            selectedLabels.remove(label)
+                        }
+                    }
+                )) {
+                    Text(label)
+                }
+                .toggleStyle(CheckboxToggleStyle())
             }
-            .toggleStyle(CheckboxToggleStyle())
         }
         .padding(16)
-        .frame(minWidth: 150)
+        .frame(minWidth: 100)
     }
 }
 
@@ -41,5 +55,5 @@ struct CheckboxToggleStyle: ToggleStyle {
 }
 
 #Preview {
-    FilterPopoverView(showApprovedOnly: .constant(false))
+    FilterPopoverView(selectedLabels: .constant(Set(["Approved"])))
 }
