@@ -9,16 +9,16 @@ import SwiftUI
 
 struct FilterPopoverView: View {
     @Binding var selectedLabels: Set<String>
-    
+
     // All available labels in the requested order
     private let availableLabels = ["No Label", "Select", "Second", "Approved", "Review", "To Do"]
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Filter by Labels")
                 .font(.headline)
                 .padding(.bottom, 4)
-            
+
             ForEach(availableLabels, id: \.self) { label in
                 Toggle(isOn: Binding(
                     get: { selectedLabels.contains(label) },
@@ -32,7 +32,7 @@ struct FilterPopoverView: View {
                 )) {
                     Text(label)
                 }
-                .toggleStyle(CheckboxToggleStyle())
+                .toggleStyle(CheckboxToggleStyle(label: label))
             }
         }
         .padding(16)
@@ -41,19 +41,39 @@ struct FilterPopoverView: View {
 }
 
 struct CheckboxToggleStyle: ToggleStyle {
+    let label: String
+
     func makeBody(configuration: Configuration) -> some View {
         HStack {
-            Image(systemName: configuration.isOn ? "checkmark.square" : "square")
-                .foregroundColor(configuration.isOn ? .accentColor : .primary)
+            let labelColor = getColorForLabel(label)
+
+            Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square.fill")
+                .foregroundColor(labelColor)
+                .font(.system(size: 16, weight: .medium))
                 .onTapGesture {
                     configuration.isOn.toggle()
                 }
-            
+
             configuration.label
         }
     }
-}
 
-#Preview {
-    FilterPopoverView(selectedLabels: .constant(Set(["Approved"])))
+    private func getColorForLabel(_ label: String) -> Color {
+        switch label {
+        case "No Label":
+            return .secondary
+        case "Select":
+            return .red
+        case "Second":
+            return .yellow
+        case "Approved":
+            return .green
+        case "Review":
+            return .blue
+        case "To Do":
+            return .purple
+        default:
+            return .secondary
+        }
+    }
 }
