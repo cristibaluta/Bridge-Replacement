@@ -147,7 +147,7 @@ enum ExternalApp: CaseIterable {
         switch self {
         case .photoshop: return "com.adobe.Photoshop"
         case .lightroom: return "com.adobe.LightroomCC"
-        case .dxo: return "com.dxo.PhotoLab7" // May vary by version
+        case .dxo: return "com.dxo.PhotoLab9" // May vary by version
         case .defaultApp: return "" // Not used for default
         }
     }
