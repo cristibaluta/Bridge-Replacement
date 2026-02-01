@@ -47,14 +47,14 @@ struct ThumbCell: View {
             )
             .onTapGesture {
                 clickCount += 1
-                
+
                 // Get current modifier keys from NSApp
                 let modifiers = NSApp.currentEvent?.modifierFlags ?? []
-                
+
                 if clickCount == 1 {
                     // Immediate single-click action with modifiers
                     onTap(modifiers)
-                    
+
                     // Start timer to detect if second click comes
                     clickTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
                         // Timer expired - it was just a single click
@@ -107,10 +107,15 @@ struct ThumbCell: View {
     }
 
     private func hasLabel() -> Bool {
-        return photo.xmp?.label != nil && !photo.xmp!.label!.isEmpty
+        return photo.toDelete || (photo.xmp?.label != nil && !photo.xmp!.label!.isEmpty)
     }
 
     private func getLabelBackgroundColor() -> Color {
+        // Check if photo is marked for deletion first
+        if photo.toDelete {
+            return .orange
+        }
+
         guard let label = photo.xmp?.label else { return .clear }
 
         switch label {
@@ -130,6 +135,11 @@ struct ThumbCell: View {
     }
 
     private func getLabelTextColor() -> Color {
+        // Check if photo is marked for deletion first
+        if photo.toDelete {
+            return .black
+        }
+
         guard let label = photo.xmp?.label else { return .primary }
 
         switch label {

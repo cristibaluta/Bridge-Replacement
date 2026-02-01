@@ -28,15 +28,20 @@ struct ThumbGridView: View {
         // Apply filtering
         if !selectedLabels.isEmpty {
             result = result.filter { photo in
-                let photoLabel = photo.xmp?.label ?? ""
-
-                // Handle "No Label" filter
-                if selectedLabels.contains("No Label") && photoLabel.isEmpty {
+                // Handle "To Delete" filter
+                if selectedLabels.contains("To Delete") && photo.toDelete {
                     return true
                 }
 
-                // Handle other specific labels
-                return selectedLabels.contains(photoLabel)
+                let photoLabel = photo.xmp?.label ?? ""
+
+                // Handle "No Label" filter (only for non-deleted photos)
+                if selectedLabels.contains("No Label") && photoLabel.isEmpty && !photo.toDelete {
+                    return true
+                }
+
+                // Handle other specific labels (only for non-deleted photos)
+                return selectedLabels.contains(photoLabel) && !photo.toDelete
             }
         }
 
@@ -68,9 +73,12 @@ struct ThumbGridView: View {
     private var availableLabels: [String] {
         var labelSet = Set<String>()
         var hasNoLabel = false
+        var hasToDelete = false
 
         for photo in photos {
-            if let label = photo.xmp?.label, !label.isEmpty {
+            if photo.toDelete {
+                hasToDelete = true
+            } else if let label = photo.xmp?.label, !label.isEmpty {
                 labelSet.insert(label)
             } else {
                 hasNoLabel = true
@@ -90,6 +98,11 @@ struct ThumbGridView: View {
             }
         }
 
+        // Add "To Delete" at the end if any photos are marked for deletion
+        if hasToDelete {
+            result.append("To Delete")
+        }
+
         return result
     }
 
@@ -107,6 +120,8 @@ struct ThumbGridView: View {
             return .blue
         case "To Do":
             return .purple
+        case "To Delete":
+            return .orange
         default:
             return .secondary
         }
@@ -341,6 +356,14 @@ struct ThumbGridView: View {
                 // Remove any label (clear label)
                 if let selectedPhoto = model.selectedPhoto {
                     removeAnyLabel(for: selectedPhoto)
+                } else {
+                    print("DEBUG: No photo selected")
+                }
+                return .handled
+            case "\u{7F}": // Delete key (backspace character)
+                // Toggle "To Delete" state
+                if let selectedPhoto = model.selectedPhoto {
+                    toggleToDeleteState(for: selectedPhoto)
                 } else {
                     print("DEBUG: No photo selected")
                 }
@@ -598,6 +621,35 @@ struct ThumbGridView: View {
         }
 
         return updatedContent
+    }
+
+    private func toggleToDeleteState(for photo: PhotoItem) {
+        // Find the current photo index in the model's photos array
+        if let photoIndex = model.photos.firstIndex(where: { $0.path == photo.path }) {
+            let currentPhoto = model.photos[photoIndex]
+
+            // Create a new PhotoItem with toggled toDelete state, preserving all other properties
+            let updatedPhoto = PhotoItem(
+                id: currentPhoto.id,
+                path: currentPhoto.path,
+                xmp: currentPhoto.xmp,
+                dateCreated: currentPhoto.dateCreated,
+                toDelete: !currentPhoto.toDelete
+            )
+
+            // Update the photos array directly
+            model.photos[photoIndex] = updatedPhoto
+
+            // Update selectedPhoto if it's the one being modified
+            if model.selectedPhoto?.path == photo.path {
+                model.selectedPhoto = updatedPhoto
+            }
+
+            let action = updatedPhoto.toDelete ? "Marked" : "Unmarked"
+            print("🗑️ \(action) photo for deletion: \(photo.path)")
+        } else {
+            print("⚠️ Photo not found in model: \(photo.path)")
+        }
     }
 
     private func updatePhotoWithXmpMetadata(photo: PhotoItem, xmpMetadata: XmpMetadata) {
