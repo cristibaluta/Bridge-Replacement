@@ -57,7 +57,7 @@ struct ContentView: View {
             }
         } content: {
             // Middle: thumbnails
-            ThumbGridView(photos: model.photos, model: model)
+            ThumbGridView(photos: model.photos, model: model, selectedApp: selectedApp)
         } detail: {
             // Right: large preview
             if let photo = model.selectedPhoto {
