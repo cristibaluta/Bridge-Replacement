@@ -174,7 +174,8 @@ struct ThumbGridView: View {
                         loadSortOption() // Load the saved sort option
                     }
                     .onChange(of: photos) { _, newPhotos in
-                        if !newPhotos.isEmpty {
+                        // Only select the first photo if there's no current selection
+                        if model.selectedPhoto == nil && !newPhotos.isEmpty {
                             model.selectedPhoto = newPhotos.first
                         }
                     }
@@ -640,10 +641,8 @@ struct ThumbGridView: View {
             // Update the photos array directly
             model.photos[photoIndex] = updatedPhoto
 
-            // Update selectedPhoto if it's the one being modified
-            if model.selectedPhoto?.path == photo.path {
-                model.selectedPhoto = updatedPhoto
-            }
+            // Always update selectedPhoto to point to the new updated photo instance (same photo, just updated)
+            model.selectedPhoto = updatedPhoto
 
             let action = updatedPhoto.toDelete ? "Marked" : "Unmarked"
             print("🗑️ \(action) photo for deletion: \(photo.path)")
@@ -655,20 +654,27 @@ struct ThumbGridView: View {
     private func updatePhotoWithXmpMetadata(photo: PhotoItem, xmpMetadata: XmpMetadata) {
         // Find the current photo index in the model's photos array
         if let photoIndex = model.photos.firstIndex(where: { $0.path == photo.path }) {
-            // Create a new PhotoItem with the updated XMP metadata but preserve the original ID and dateCreated
-            let updatedPhoto = PhotoItem(id: photo.id, path: photo.path, xmp: xmpMetadata, dateCreated: photo.dateCreated)
+            let currentPhoto = model.photos[photoIndex]
+
+            // Create a new PhotoItem with the updated XMP metadata but preserve the original ID, dateCreated, and toDelete state
+            let updatedPhoto = PhotoItem(
+                id: photo.id,
+                path: photo.path,
+                xmp: xmpMetadata,
+                dateCreated: photo.dateCreated,
+                toDelete: currentPhoto.toDelete
+            )
 
             // Update the photos array directly (since BrowserModel is @Published)
             model.photos[photoIndex] = updatedPhoto
 
-            // Update selectedPhoto if it's the one being modified
-            if model.selectedPhoto?.path == photo.path {
-                model.selectedPhoto = updatedPhoto
-            }
+            // Update selectedPhoto to point to the new updated photo instance (same photo, just updated)
+            model.selectedPhoto = updatedPhoto
 
             print("🔄 PhotoItem updated in model with XMP metadata")
             print("   Path: \(photo.path)")
             print("   Label: \(xmpMetadata.label ?? "None")")
+            print("   To Delete: \(updatedPhoto.toDelete)")
             print("   Index: \(photoIndex)")
             print("   ID preserved: \(photo.id)")
         } else {
