@@ -41,17 +41,17 @@ struct ThumbCell: View {
                 loadThumbnail()
             }
 
-            // Filename with green pill background for approved photos
+            // Filename with colored pill background based on label
             Text(filename)
                 .font(.system(size: 11))
                 .lineLimit(1)
                 .padding(4)
                 .background(
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(photo.xmp?.label == "Approved" ? Color(red: 133/255, green: 199/255, blue: 102/255) : Color.clear)
-                        .opacity(photo.xmp?.label == "Approved" ? 1 : 0)
+                        .fill(getLabelBackgroundColor())
+                        .opacity(hasLabel() ? 1 : 0)
                 )
-                .foregroundColor(photo.xmp?.label == "Approved" ? .black : .primary)
+                .foregroundColor(getLabelTextColor())
                 .frame(height: 30)
 
             Spacer()
@@ -73,6 +73,48 @@ struct ThumbCell: View {
 
             self.thumbnailImage = image
             self.isLoading = false
+        }
+    }
+
+    private func hasLabel() -> Bool {
+        return photo.xmp?.label != nil && !photo.xmp!.label!.isEmpty
+    }
+
+    private func getLabelBackgroundColor() -> Color {
+        guard let label = photo.xmp?.label else { return .clear }
+
+        switch label {
+        case "Select":
+            return .red
+        case "Second":
+            return .yellow
+        case "Approved":
+            return Color(red: 133/255, green: 199/255, blue: 102/255) // Keep existing green
+        case "Review":
+            return .blue
+        case "To Do":
+            return .purple
+        default:
+            return .clear
+        }
+    }
+
+    private func getLabelTextColor() -> Color {
+        guard let label = photo.xmp?.label else { return .primary }
+
+        switch label {
+        case "Select":
+            return .white
+        case "Second":
+            return .black
+        case "Approved":
+            return .black
+        case "Review":
+            return .white
+        case "To Do":
+            return .white
+        default:
+            return .primary
         }
     }
 }
