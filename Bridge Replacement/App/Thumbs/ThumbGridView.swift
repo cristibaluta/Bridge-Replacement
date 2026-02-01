@@ -4,6 +4,7 @@ struct ThumbGridView: View {
     let photos: [PhotoItem]
     @ObservedObject var model: BrowserModel
     let selectedApp: PhotoApp?
+    let onOpenSelectedPhotos: (([PhotoItem]) -> Void)?
     @FocusState private var isFocused: Bool
     @State private var lastScrolledRow: Int = -1
     @State private var showFilterPopover = false
@@ -125,10 +126,6 @@ struct ThumbGridView: View {
                                     isMultiSelected: selectedPhotos.contains(photo.id),
                                     onTap: { modifiers in
                                         handlePhotoTap(photo: photo, modifiers: modifiers)
-                                    },
-                                    onDoubleClick: {
-                                        model.selectedPhoto = photo
-                                        openInExternalApp(photo: photo)
                                     }
                                 )
                                 .frame(width: 100, height: 150)
@@ -209,6 +206,13 @@ struct ThumbGridView: View {
                         .foregroundColor(.secondary)
                 }
 
+                // Show selection count when multiple photos are selected
+                if selectedPhotos.count > 1 {
+                    Text("\(selectedPhotos.count) selected")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+
                 Spacer()
 
                 // Sort button
@@ -285,6 +289,14 @@ struct ThumbGridView: View {
             newIndex = max(0, currentIndex - columnsCount)
         case .downArrow:
             newIndex = min(photos.count - 1, currentIndex + columnsCount)
+        case .return:
+            // Enter key: Open selected photos in external app
+            if selectedPhotos.count > 1 {
+                openSelectedPhotosInExternalApp()
+            } else if let selectedPhoto = model.selectedPhoto {
+                openInExternalApp(photo: selectedPhoto)
+            }
+            return .handled
         default:
             // Handle Command+A for Select All
             if keyPress.modifiers.contains(.command) && keyPress.characters == "a" {
@@ -598,6 +610,35 @@ struct ThumbGridView: View {
             print("   ID preserved: \(photo.id)")
         } else {
             print("⚠️ Photo not found in model: \(photo.path)")
+        }
+    }
+
+    private func openSelectedPhotosInExternalApp() {
+        // Get all selected photos
+        let selectedPhotoItems = filteredPhotos.filter { selectedPhotos.contains($0.id) }
+        let urls = selectedPhotoItems.map { URL(fileURLWithPath: $0.path) }
+
+        guard !urls.isEmpty else { return }
+
+        if let app = selectedApp {
+            // Use the selected PhotoApp
+            do {
+                try NSWorkspace.shared.open(urls, withApplicationAt: app.url, options: [], configuration: [:])
+                print("Opening \(urls.count) photos with \(app.displayName)")
+            } catch {
+                print("Failed to open photos with \(app.displayName): \(error)")
+                // Fallback to default application
+                for url in urls {
+                    NSWorkspace.shared.open(url)
+                }
+                print("Opening \(urls.count) photos in default app (fallback)")
+            }
+        } else {
+            // Use system default application
+            for url in urls {
+                NSWorkspace.shared.open(url)
+            }
+            print("Opening \(urls.count) photos in default app")
         }
     }
 

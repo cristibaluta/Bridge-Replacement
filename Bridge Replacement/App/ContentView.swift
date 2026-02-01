@@ -25,6 +25,8 @@ struct ContentView: View {
     @SceneStorage("columnVisibility") private var columnVisibilityStorage: String = "all"
     @State private var showFolderPopover = false
     @State private var isSidebarCollapsed = false
+    @State private var selectedPhotosCount = 0
+    @State private var openSelectedPhotosCallback: (() -> Void)?
 
     private let selectedAppKey = "SelectedExternalApp"
 
@@ -57,7 +59,9 @@ struct ContentView: View {
             }
         } content: {
             // Middle: thumbnails
-            ThumbGridView(photos: model.photos, model: model, selectedApp: selectedApp)
+            ThumbGridView(photos: model.photos, model: model, selectedApp: selectedApp, onOpenSelectedPhotos: { photos in
+                openMultiplePhotosInExternalApp(photos: photos)
+            })
         } detail: {
             // Right: large preview
             if let photo = model.selectedPhoto {
@@ -96,6 +100,7 @@ struct ContentView: View {
                 // Button to open in selected app
                 Button(action: {
                     if let selectedPhoto = model.selectedPhoto {
+                        // For now, always open single photo - will be enhanced
                         openInExternalApp(photo: selectedPhoto)
                     }
                 }) {
@@ -145,6 +150,33 @@ struct ContentView: View {
         }
         .frame(minWidth: 1200, minHeight: 700)
         .preferredColorScheme(.dark)
+    }
+
+    private func openMultiplePhotosInExternalApp(photos: [PhotoItem]) {
+        let urls = photos.map { URL(fileURLWithPath: $0.path) }
+
+        guard !urls.isEmpty else { return }
+
+        if let app = selectedApp {
+            // Use the selected PhotoApp
+            do {
+                try NSWorkspace.shared.open(urls, withApplicationAt: app.url, options: [], configuration: [:])
+                print("Opening \(urls.count) photos with \(app.displayName)")
+            } catch {
+                print("Failed to open photos with \(app.displayName): \(error)")
+                // Fallback to default application
+                for url in urls {
+                    NSWorkspace.shared.open(url)
+                }
+                print("Opening \(urls.count) photos in default app (fallback)")
+            }
+        } else {
+            // Use system default application
+            for url in urls {
+                NSWorkspace.shared.open(url)
+            }
+            print("Opening \(urls.count) photos in default app")
+        }
     }
 
     private func openInExternalApp(photo: PhotoItem) {

@@ -11,12 +11,9 @@ struct ThumbCell: View {
     let isSelected: Bool
     let isMultiSelected: Bool
     let onTap: (NSEvent.ModifierFlags) -> Void
-    let onDoubleClick: () -> Void
     let size: CGFloat = 100
     @State private var thumbnailImage: NSImage?
     @State private var isLoading = false
-    @State private var clickCount = 0
-    @State private var clickTimer: Timer?
 
     private var filename: String {
         URL(fileURLWithPath: photo.path).lastPathComponent
@@ -46,26 +43,9 @@ struct ThumbCell: View {
                     )
             )
             .onTapGesture {
-                clickCount += 1
-
                 // Get current modifier keys from NSApp
                 let modifiers = NSApp.currentEvent?.modifierFlags ?? []
-
-                if clickCount == 1 {
-                    // Immediate single-click action with modifiers
-                    onTap(modifiers)
-
-                    // Start timer to detect if second click comes
-                    clickTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
-                        // Timer expired - it was just a single click
-                        clickCount = 0
-                    }
-                } else if clickCount == 2 {
-                    // Double-click detected
-                    clickTimer?.invalidate()
-                    clickCount = 0
-                    onDoubleClick()
-                }
+                onTap(modifiers)
             }
             .onAppear {
                 loadThumbnail()
