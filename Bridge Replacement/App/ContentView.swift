@@ -160,8 +160,12 @@ struct ContentView: View {
                 openInExternalApp(photo: selectedPhoto)
             }
         }) {
-            Text(selectedApp?.displayName ?? "Select App")
-                .foregroundColor(model.selectedPhoto != nil ? .primary : .secondary)
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 12, weight: .medium))
+                Text(selectedApp?.displayName ?? "Select App")
+            }
+            .foregroundColor(model.selectedPhoto != nil ? .primary : .secondary)
         }
         .disabled(model.selectedPhoto == nil)
         .help("Open in \(selectedApp?.displayName ?? "external app")")
