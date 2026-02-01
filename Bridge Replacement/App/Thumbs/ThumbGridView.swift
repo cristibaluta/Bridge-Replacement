@@ -126,6 +126,15 @@ struct ThumbGridView: View {
                                     isMultiSelected: selectedPhotos.contains(photo.id),
                                     onTap: { modifiers in
                                         handlePhotoTap(photo: photo, modifiers: modifiers)
+                                    },
+                                    onDoubleClick: {
+                                        model.selectedPhoto = photo
+                                        // If multiple photos are selected, open all of them
+                                        if selectedPhotos.count > 1 {
+                                            openSelectedPhotosInExternalApp()
+                                        } else {
+                                            openInExternalApp(photo: photo)
+                                        }
                                     }
                                 )
                                 .frame(width: 100, height: 150)
