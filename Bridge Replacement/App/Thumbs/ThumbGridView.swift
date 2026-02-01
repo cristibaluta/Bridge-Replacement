@@ -159,6 +159,29 @@ struct ThumbGridView: View {
 
             // Filter and Sort bar
             HStack(spacing: 12) {
+                // Sort button
+                Button(action: {
+                    showSortPopover.toggle()
+                }) {
+                    Text("Sort")
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 3)
+                                .stroke(Color.gray.opacity(0.5), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .popover(isPresented: $showSortPopover) {
+                    SortPopoverView(sortOption: $sortOption)
+                }
+                .onChange(of: sortOption) { _, newValue in
+                    saveSortOption(newValue)
+                }
+
                 // Filter section with unified rounded rectangle
                 HStack(spacing: 8) {
                     // Filter button (existing functionality)
@@ -206,36 +229,17 @@ struct ThumbGridView: View {
                         .foregroundColor(.secondary)
                 }
 
-                // Show selection count when multiple photos are selected
-                if selectedPhotos.count > 1 {
-                    Text("\(selectedPhotos.count) selected")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                }
-
                 Spacer()
 
-                // Sort button
-                Button(action: {
-                    showSortPopover.toggle()
-                }) {
-                    Text("Sort")
+                // Show selection count when multiple photos are selected
+                if selectedPhotos.count > 1 {
+                    Text("\(selectedPhotos.count) of \(photos.count) selected")
                         .font(.caption)
-                        .foregroundColor(.primary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.clear)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 3)
-                                .stroke(Color.gray, lineWidth: 1)
-                        )
-                }
-                .buttonStyle(PlainButtonStyle())
-                .popover(isPresented: $showSortPopover) {
-                    SortPopoverView(sortOption: $sortOption)
-                }
-                .onChange(of: sortOption) { _, newValue in
-                    saveSortOption(newValue)
+                        .foregroundColor(.blue)
+                } else {
+                    Text("\(photos.count) photos")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
             .padding(.horizontal, 16)
