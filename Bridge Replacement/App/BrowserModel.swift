@@ -7,7 +7,8 @@
 import Foundation
 import CoreServices
 
-func loadFolderTree(at url: URL) -> FolderItem {
+func loadFolderTree(at url: URL, maxDepth: Int = 2, currentDepth: Int = 0) -> FolderItem {
+    print("Load folder tree: \(url.path) currentDepth: \(currentDepth)")
     var children: [FolderItem] = []
 
     let keys: Set<URLResourceKey> = [.isDirectoryKey, .isHiddenKey]
@@ -18,7 +19,6 @@ func loadFolderTree(at url: URL) -> FolderItem {
         includingPropertiesForKeys: Array(keys),
         options: [.skipsHiddenFiles]
     ) {
-
         let sortedFolders = items
             .compactMap { item -> URL? in
                 guard let values = try? item.resourceValues(forKeys: keys), values.isDirectory == true else { return nil }
@@ -29,7 +29,17 @@ func loadFolderTree(at url: URL) -> FolderItem {
             }
 
         for folder in sortedFolders {
-            children.append(loadFolderTree(at: folder))
+            if currentDepth < maxDepth {
+                // Load recursively up to maxDepth
+                children.append(loadFolderTree(at: folder, maxDepth: maxDepth, currentDepth: currentDepth + 1))
+            } else {
+                // At maxDepth, just check if this folder has subfolders to determine if it should be expandable
+                let hasSubfolders = hasDirectSubfolders(at: folder)
+                children.append(FolderItem(
+                    url: folder,
+                    children: hasSubfolders ? [] : nil // Empty array means "expandable but not loaded", nil means "no children"
+                ))
+            }
         }
     }
 
@@ -37,6 +47,31 @@ func loadFolderTree(at url: URL) -> FolderItem {
         url: url,
         children: children.isEmpty ? nil : children
     )
+}
+
+func hasDirectSubfolders(at url: URL) -> Bool {
+    let keys: Set<URLResourceKey> = [.isDirectoryKey, .isHiddenKey]
+    let fm = FileManager.default
+
+    guard let items = try? fm.contentsOfDirectory(
+        at: url,
+        includingPropertiesForKeys: Array(keys),
+        options: [.skipsHiddenFiles]
+    ) else { return false }
+
+    // Check if any item is a directory
+    for item in items {
+        if let values = try? item.resourceValues(forKeys: keys), values.isDirectory == true {
+            return true
+        }
+    }
+    return false
+}
+
+func loadFolderChildren(for folder: FolderItem) -> [FolderItem] {
+    // Load children on demand (2 levels deep from this folder)
+    let childTree = loadFolderTree(at: folder.url, maxDepth: 2, currentDepth: 0)
+    return childTree.children ?? []
 }
 
 
@@ -100,12 +135,12 @@ final class BrowserModel: ObservableObject {
     @Published var photos: [PhotoItem] = []
 
     init() {
-        let volumesURL = URL(fileURLWithPath: "/Volumes")
         let homeURL = FileManager.default.homeDirectoryForCurrentUser
+        let volumesURL = URL(fileURLWithPath: "/Volumes")
 
         self.rootFolders = [
-            loadFolderTree(at: volumesURL),
-            loadFolderTree(at: homeURL)
+            loadFolderTree(at: volumesURL, maxDepth: 1), // Only 1 level for volumes to avoid scanning large drives
+            loadFolderTree(at: homeURL, maxDepth: 2)     // 2 levels for home directory
         ]
     }
 
