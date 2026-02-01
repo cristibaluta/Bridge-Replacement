@@ -12,6 +12,7 @@ struct LargePreviewView: View {
     @State private var preview: NSImage?
     @State private var isLoading = false
     @State private var exifData: [String: Any]?
+    @State private var alignToTopLeft = UserDefaults.standard.bool(forKey: "ImageAlignmentTopLeft")
 
     var body: some View {
         ZStack {
@@ -22,10 +23,23 @@ struct LargePreviewView: View {
 
             // Main image view
             if let nsImage = preview {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
-                    .padding()
+                if alignToTopLeft {
+                    HStack {
+                        VStack {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .scaledToFit()
+                                .padding()
+                            Spacer()
+                        }
+                        Spacer()
+                    }
+                } else {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .scaledToFit()
+                        .padding()
+                }
             } else if isLoading {
                 ProgressView("Loading...")
                     .progressViewStyle(CircularProgressViewStyle())
@@ -36,6 +50,23 @@ struct LargePreviewView: View {
 
             // Overlay positioned using stacks and spacers
             VStack {
+                // Top overlay with alignment button
+                HStack {
+                    Button(action: {
+                        alignToTopLeft.toggle()
+                        UserDefaults.standard.set(alignToTopLeft, forKey: "ImageAlignmentTopLeft")
+                    }) {
+                        Image(systemName: alignToTopLeft ? "arrow.down.right.square" : "arrow.up.left.square")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .padding()
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help(alignToTopLeft ? "Center image" : "Align to top-left")
+
+                    Spacer() // Push button to left
+                }
+
                 Spacer() // Push content to bottom
 
                 HStack {

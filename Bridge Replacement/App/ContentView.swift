@@ -142,7 +142,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 1200, minHeight: 700)
         .preferredColorScheme(.dark)
-        .background(Rectangle().fill(Color(red: 0.05, green: 0.05, blue: 0.06)).opacity(0.5))
+//        .background(Rectangle().fill(Color(red: 0.05, green: 0.05, blue: 0.06)).opacity(0.5))
     }
 
     private func openInExternalApp(photo: PhotoItem) {
