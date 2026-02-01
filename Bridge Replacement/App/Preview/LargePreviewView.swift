@@ -40,8 +40,8 @@ struct LargePreviewView: View {
 
                 HStack {
                     // EXIF overlay in bottom left
-                    if let exifData = exifData {
-                        CompactExifOverlayView(exifData: exifData)
+                    if let nsImage = preview, let exifData = exifData {
+                        CompactExifOverlayView(nsImage: nsImage, exifData: exifData)
                     }
 
                     Spacer() // Push overlay to left
@@ -121,176 +121,128 @@ struct LargePreviewView: View {
     }
 }
 
-struct ExifOverlayView: View {
+struct CompactExifOverlayView: View {
+    let nsImage: NSImage
     let exifData: [String: Any]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Camera Info")
-                .font(.headline)
-                .foregroundColor(.white)
-
-            // Camera details
-            if let make = exifData["Make"] as? String,
-               let model = exifData["Model"] as? String {
-                Text("\(make) \(model)")
-                    .font(.subheadline)
-                    .foregroundColor(.white)
-            }
-
-            if let lens = exifData["LensModel"] as? String {
-                Text("Lens: \(lens)")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.9))
-            }
-
-            Divider()
-                .background(Color.white.opacity(0.5))
-
-            // Shooting parameters
+        if nsImage.size.width > nsImage.size.height {
             HStack(spacing: 16) {
-                if let iso = exifData["ISO"] as? NSNumber {
-                    Text("ISO \(iso)")
-                        .font(.caption)
-                        .foregroundColor(.white)
-                }
+                Exif1View(exifData: exifData)
+                Exif2View(exifData: exifData)
+            }
+            .padding(16)
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                Exif1View(exifData: exifData)
+                Exif2View(exifData: exifData)
+            }
+            .padding(16)
+        }
+    }
+}
 
+struct Exif1View: View {
+    let exifData: [String: Any]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+
+            HStack(spacing: 16) {
+                // Aperture
                 if let aperture = exifData["Aperture"] as? NSNumber {
-                    Text("f/\(String(format: "%.1f", aperture.doubleValue))")
-                        .font(.caption)
-                        .foregroundColor(.white)
+                    Text("ƒ/\(String(format: "%.1f", aperture.doubleValue))")
                 }
-
+                // Shutter speed
                 if let shutter = exifData["ShutterSpeed"] as? NSNumber {
                     let shutterValue = shutter.doubleValue
                     if shutterValue < 1 {
                         Text("1/\(Int(round(1/shutterValue)))s")
-                            .font(.caption)
-                            .foregroundColor(.white)
                     } else {
                         Text("\(String(format: "%.1f", shutterValue))s")
-                            .font(.caption)
-                            .foregroundColor(.white)
                     }
                 }
             }
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(.white)
 
-            if let focal = exifData["FocalLength"] as? NSNumber {
-                Text("\(String(format: "%.0f", focal.doubleValue))mm")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.9))
+            HStack(spacing: 10) {
+                // ISO
+                if let iso = exifData["ISO"] as? NSNumber {
+                    Text("ISO \(iso)")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white)
+                }
             }
-
-            // Image dimensions
-            if let width = exifData["ImageWidth"] as? NSNumber,
-               let height = exifData["ImageHeight"] as? NSNumber {
-                Text("\(width) × \(height)")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
-            }
-
-            // Date/time if available
-            if let dateTime = exifData["DateTime"] as? Date {
-                Text(dateTime, style: .date)
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
-            }
-
-            // GPS if available
-            if let gps = exifData["GPS"] as? [String: Any],
-               let lat = gps["Latitude"] as? NSNumber,
-               let lng = gps["Longitude"] as? NSNumber {
-                Text("GPS: \(String(format: "%.4f", lat.doubleValue)), \(String(format: "%.4f", lng.doubleValue))")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
-            }
+            .foregroundColor(.gray)
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 6)
                 .fill(Color.black.opacity(0.7))
         )
-        .padding(16)
-        .frame(maxWidth: 250, alignment: .leading)
     }
 }
 
-struct CompactExifOverlayView: View {
+struct Exif2View: View {
     let exifData: [String: Any]
 
     var body: some View {
-        HStack(spacing: 16) {
-            // LEFT PANEL
-            VStack(alignment: .leading, spacing: 10) {
-
-                HStack(spacing: 16) {
-                    // Aperture
-                    if let aperture = exifData["Aperture"] as? NSNumber {
-                        Text("ƒ/\(String(format: "%.1f", aperture.doubleValue))")
-                    }
-                    // Shutter speed
-                    if let shutter = exifData["ShutterSpeed"] as? NSNumber {
-                        let shutterValue = shutter.doubleValue
-                        if shutterValue < 1 {
-                            Text("1/\(Int(round(1/shutterValue)))s")
-                        } else {
-                            Text("\(String(format: "%.1f", shutterValue))s")
-                        }
-                    }
-                }
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
-
-                HStack(spacing: 10) {
-                    // ISO
-                    if let iso = exifData["ISO"] as? NSNumber {
-                        Text("ISO \(iso)")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white)
-                    }
-                }
-                .foregroundColor(.gray)
+        VStack(alignment: .leading, spacing: 6) {
+            // Camera details
+            if let make = exifData["Make"] as? String,
+               let model = exifData["Model"] as? String {
+                Text("\(make) \(model)")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.black.opacity(0.7))
-            )
 
-            // RIGHT PANEL
-            VStack(alignment: .leading, spacing: 6) {
-                // Camera details
-                if let make = exifData["Make"] as? String,
-                   let model = exifData["Model"] as? String {
-                    Text("\(make) \(model)")
+            HStack {
+                if let lens = exifData["LensModel"] as? String {
+                    Text(lens)
                 }
 
-                HStack {
-                    if let lens = exifData["LensModel"] as? String {
-                        Text("Lens: \(lens)")
-                    }
-
-                    // Focal Length
-                    if let focal = exifData["FocalLength"] as? NSNumber {
-                        Text("\(String(format: "%.0f", focal.doubleValue))mm")
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.gray.opacity(0.6))
-                            )
-                    }
+                // Focal Length
+                if let focal = exifData["FocalLength"] as? NSNumber {
+                    Text("\(String(format: "%.0f", focal.doubleValue))mm")
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.gray.opacity(0.6))
+                        )
                 }
             }
-            .font(.system(size: 14))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.black.opacity(0.7), lineWidth: 2)
-            )
         }
-        .padding(16)
+        .font(.system(size: 14))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.black.opacity(0.7), lineWidth: 2)
+        )
     }
 }
+
+//// Image dimensions
+//if let width = exifData["ImageWidth"] as? NSNumber,
+//   let height = exifData["ImageHeight"] as? NSNumber {
+//    Text("\(width) × \(height)")
+//        .font(.caption2)
+//        .foregroundColor(.white.opacity(0.8))
+//}
+//
+//// Date/time if available
+//if let dateTime = exifData["DateTime"] as? Date {
+//    Text(dateTime, style: .date)
+//        .font(.caption2)
+//        .foregroundColor(.white.opacity(0.8))
+//}
+//
+//// GPS if available
+//if let gps = exifData["GPS"] as? [String: Any],
+//   let lat = gps["Latitude"] as? NSNumber,
+//   let lng = gps["Longitude"] as? NSNumber {
+//    Text("GPS: \(String(format: "%.4f", lat.doubleValue)), \(String(format: "%.4f", lng.doubleValue))")
+//        .font(.caption2)
+//        .foregroundColor(.white.opacity(0.8))
+//}

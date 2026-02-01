@@ -152,8 +152,8 @@ struct ThumbGridView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
             .background(Color(NSColor.controlBackgroundColor))
         }
     }
