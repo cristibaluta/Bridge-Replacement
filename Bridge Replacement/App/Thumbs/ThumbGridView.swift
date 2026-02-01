@@ -230,6 +230,10 @@ struct ThumbGridView: View {
                     Text("\(selectedPhotos.count) of \(photos.count) selected")
                         .font(.caption)
                         .foregroundColor(.blue)
+                } else if selectedLabels.count > 0 {
+                    Text("\(filteredPhotos.count) of \(photos.count) photos")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 } else {
                     Text("\(photos.count) photos")
                         .font(.caption)
