@@ -9,9 +9,25 @@ import SwiftUI
 
 struct FilterPopoverView: View {
     @Binding var selectedLabels: Set<String>
+    let photos: [PhotoItem]
 
     // All available labels in the requested order
     private let availableLabels = ["No Label", "Select", "Second", "Approved", "Review", "To Do"]
+
+    // Calculate count for each label
+    private func getCountForLabel(_ label: String) -> Int {
+        if label == "No Label" {
+            return photos.filter { photo in
+                let photoLabel = photo.xmp?.label ?? ""
+                return photoLabel.isEmpty
+            }.count
+        } else {
+            return photos.filter { photo in
+                let photoLabel = photo.xmp?.label ?? ""
+                return photoLabel == label
+            }.count
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -20,6 +36,7 @@ struct FilterPopoverView: View {
                 .padding(.bottom, 4)
 
             ForEach(availableLabels, id: \.self) { label in
+                let count = getCountForLabel(label)
                 Toggle(isOn: Binding(
                     get: { selectedLabels.contains(label) },
                     set: { isSelected in
@@ -30,7 +47,13 @@ struct FilterPopoverView: View {
                         }
                     }
                 )) {
-                    Text(label)
+                    HStack {
+                        Text(label)
+                        if count > 0 {
+                            Text("(\(count))")
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 .toggleStyle(CheckboxToggleStyle(label: label))
             }

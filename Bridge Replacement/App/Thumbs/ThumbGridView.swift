@@ -165,7 +165,7 @@ struct ThumbGridView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .popover(isPresented: $showFilterPopover) {
-                        FilterPopoverView(selectedLabels: $selectedLabels)
+                        FilterPopoverView(selectedLabels: $selectedLabels, photos: photos)
                     }
 
                     // Horizontal filter checkmarks for available labels
