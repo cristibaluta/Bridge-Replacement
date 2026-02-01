@@ -56,7 +56,7 @@ struct LargePreviewView: View {
                         alignToTopLeft.toggle()
                         UserDefaults.standard.set(alignToTopLeft, forKey: "ImageAlignmentTopLeft")
                     }) {
-                        Image(systemName: alignToTopLeft ? "arrow.down.right.square" : "arrow.up.left.square")
+                        Image(systemName: alignToTopLeft ? "arrow.up.left.square.fill" : "arrow.up.left.square")
                             .font(.title2)
                             .foregroundColor(.white)
                             .padding()
@@ -70,12 +70,19 @@ struct LargePreviewView: View {
                 Spacer() // Push content to bottom
 
                 HStack {
-                    // EXIF overlay in bottom left
-                    if let nsImage = preview, let exifData = exifData {
-                        CompactExifOverlayView(nsImage: nsImage, exifData: exifData)
+                    // EXIF overlay positioning based on photo alignment
+                    if alignToTopLeft {
+                        Spacer() // Push overlay to right
+                        if let nsImage = preview, let exifData = exifData {
+                            CompactExifOverlayView(nsImage: nsImage, exifData: exifData)
+                        }
+                    } else {
+                        // EXIF overlay in bottom left when photo is centered
+                        if let nsImage = preview, let exifData = exifData {
+                            CompactExifOverlayView(nsImage: nsImage, exifData: exifData)
+                        }
+                        Spacer() // Push overlay to left
                     }
-
-                    Spacer() // Push overlay to left
                 }
             }
         }
