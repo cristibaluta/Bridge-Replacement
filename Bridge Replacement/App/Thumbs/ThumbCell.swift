@@ -9,7 +9,8 @@ import SwiftUI
 struct ThumbCell: View {
     let photo: PhotoItem
     let isSelected: Bool
-    let onTap: () -> Void
+    let isMultiSelected: Bool
+    let onTap: (NSEvent.ModifierFlags) -> Void
     let onDoubleClick: () -> Void
     let size: CGFloat = 100
     @State private var thumbnailImage: NSImage?
@@ -39,14 +40,20 @@ struct ThumbCell: View {
             .frame(width: size, height: size)
             .overlay(
                 Rectangle()
-                    .stroke(isSelected ? Color.blue : .clear, lineWidth: 2)
+                    .stroke(
+                        (isSelected || isMultiSelected) ? Color.blue : .clear,
+                        lineWidth: 2
+                    )
             )
             .onTapGesture {
                 clickCount += 1
 
+                // Get current modifier keys from NSApp
+                let modifiers = NSApp.currentEvent?.modifierFlags ?? []
+
                 if clickCount == 1 {
-                    // Immediate single-click action
-                    onTap()
+                    // Immediate single-click action with modifiers
+                    onTap(modifiers)
 
                     // Start timer to detect if second click comes
                     clickTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in

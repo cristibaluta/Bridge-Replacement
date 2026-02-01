@@ -10,6 +10,8 @@ struct ThumbGridView: View {
     @State private var selectedLabels: Set<String> = []
     @State private var showSortPopover = false
     @State private var sortOption: SortOption = .name
+    @State private var selectedPhotos: Set<UUID> = []
+    @State private var lastSelectedIndex: Int?
 
     private let sortOptionKey = "SelectedSortOption"
 
@@ -120,8 +122,9 @@ struct ThumbGridView: View {
                                 ThumbCell(
                                     photo: photo,
                                     isSelected: model.selectedPhoto?.id == photo.id,
-                                    onTap: {
-                                        model.selectedPhoto = photo
+                                    isMultiSelected: selectedPhotos.contains(photo.id),
+                                    onTap: { modifiers in
+                                        handlePhotoTap(photo: photo, modifiers: modifiers)
                                     },
                                     onDoubleClick: {
                                         model.selectedPhoto = photo
@@ -237,6 +240,36 @@ struct ThumbGridView: View {
         }
     }
 
+    private func handlePhotoTap(photo: PhotoItem, modifiers: NSEvent.ModifierFlags) {
+        let photoIndex = filteredPhotos.firstIndex(where: { $0.id == photo.id }) ?? 0
+
+        if modifiers.contains(.command) {
+            // Command+click: Toggle individual selection
+            if selectedPhotos.contains(photo.id) {
+                selectedPhotos.remove(photo.id)
+            } else {
+                selectedPhotos.insert(photo.id)
+                model.selectedPhoto = photo
+                lastSelectedIndex = photoIndex
+            }
+        } else if modifiers.contains(.shift) && lastSelectedIndex != nil {
+            // Shift+click: Select range from last selected to current
+            let startIndex = min(lastSelectedIndex!, photoIndex)
+            let endIndex = max(lastSelectedIndex!, photoIndex)
+
+            for index in startIndex...endIndex {
+                selectedPhotos.insert(filteredPhotos[index].id)
+            }
+            model.selectedPhoto = photo
+        } else {
+            // Regular click: Clear selection and select single photo
+            selectedPhotos.removeAll()
+            selectedPhotos.insert(photo.id)
+            model.selectedPhoto = photo
+            lastSelectedIndex = photoIndex
+        }
+    }
+
     private func handleKeyPress(_ keyPress: KeyPress, proxy: ScrollViewProxy, viewportHeight: CGFloat) -> KeyPress.Result {
         guard !photos.isEmpty else { return .ignored }
 
@@ -253,6 +286,19 @@ struct ThumbGridView: View {
         case .downArrow:
             newIndex = min(photos.count - 1, currentIndex + columnsCount)
         default:
+            // Handle Command+A for Select All
+            if keyPress.modifiers.contains(.command) && keyPress.characters == "a" {
+                selectedPhotos.removeAll()
+                for photo in filteredPhotos {
+                    selectedPhotos.insert(photo.id)
+                }
+                if let firstPhoto = filteredPhotos.first {
+                    model.selectedPhoto = firstPhoto
+                    lastSelectedIndex = 0
+                }
+                return .handled
+            }
+
             // Handle label keys (6-0 for different labels)
             let labelKey = keyPress.characters
             var targetLabel: String? = nil
