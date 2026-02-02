@@ -187,6 +187,23 @@ class ThumbsManager: ObservableObject {
         }
     }
 
+    /// Stop all pending thumbnail requests and clear the queue
+    /// Useful when switching folders to prevent processing thumbnails for old folder
+    func stopQueue() {
+        requestQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Clear all pending requests
+            self.pendingRequests.removeAll()
+            self.priorityQueue.removeAll()
+
+            // Reset the processing flag so new requests can start fresh
+            self.isProcessingQueue = false
+
+            print("ThumbsManager: Queue stopped and cleared")
+        }
+    }
+
     // MARK: - Private Methods
 
     private func cacheKey(for path: String) -> String {

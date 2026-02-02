@@ -128,6 +128,8 @@ final class BrowserModel: ObservableObject {
     @Published var rootFolders: [FolderItem]
     @Published var selectedFolder: FolderItem? {
         didSet {
+            // Stop any pending thumbnail requests for the previous folder
+            ThumbsManager.shared.stopQueue()
             loadPhotosForSelectedFolder()
         }
     }
