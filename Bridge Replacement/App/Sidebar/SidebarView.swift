@@ -11,6 +11,7 @@ struct SidebarView: View {
     @ObservedObject var model: BrowserModel
     @State private var expandedFolders: Set<URL> = []
     @State private var showingFolderPicker = false
+    @State private var showingAddPopover = false
     let onDoubleClick: (() -> Void)?
 
     private let expandedFoldersKey = "ExpandedFolders"
@@ -96,7 +97,7 @@ struct SidebarView: View {
             // Bottom bar with add and remove buttons
             HStack {
                 Button(action: {
-                    showingFolderPicker = true
+                    showingAddPopover = true
                 }) {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .medium))
@@ -108,6 +109,19 @@ struct SidebarView: View {
                 .frame(width: 24, height: 32)
                 .contentShape(Rectangle())
                 .help("Add folder")
+                .popover(isPresented: $showingAddPopover) {
+                    AddFolderPopover(
+                        model: model,
+                        onAddVolumes: {
+                            showingAddPopover = false
+                            addVolumesFolder()
+                        },
+                        onAddCustomFolder: {
+                            showingAddPopover = false
+                            showingFolderPicker = true
+                        }
+                    )
+                }
 
                 Button(action: {
                     if let selectedFolder = model.selectedFolder {
@@ -237,5 +251,10 @@ struct SidebarView: View {
     private func isRootFolderSelected() -> Bool {
         guard let selectedFolder = model.selectedFolder else { return false }
         return isRootFolder(selectedFolder.url)
+    }
+
+    private func addVolumesFolder() {
+        let volumesURL = URL(fileURLWithPath: "/Volumes")
+        model.addFolder(at: volumesURL)
     }
 }
