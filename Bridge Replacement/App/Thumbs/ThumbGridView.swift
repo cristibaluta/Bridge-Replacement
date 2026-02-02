@@ -306,20 +306,20 @@ struct ThumbGridView: View {
     }
 
     private func handleKeyPress(_ keyPress: KeyPress, proxy: ScrollViewProxy, viewportHeight: CGFloat) -> KeyPress.Result {
-        guard !photos.isEmpty else { return .ignored }
+        guard !filteredPhotos.isEmpty else { return .ignored }
 
-        let currentIndex = photos.firstIndex { $0.id == model.selectedPhoto?.id } ?? 0
+        let currentIndex = filteredPhotos.firstIndex { $0.id == model.selectedPhoto?.id } ?? 0
         var newIndex = currentIndex
 
         switch keyPress.key {
         case .leftArrow:
             newIndex = max(0, currentIndex - 1)
         case .rightArrow:
-            newIndex = min(photos.count - 1, currentIndex + 1)
+            newIndex = min(filteredPhotos.count - 1, currentIndex + 1)
         case .upArrow:
             newIndex = max(0, currentIndex - columnsCount)
         case .downArrow:
-            newIndex = min(photos.count - 1, currentIndex + columnsCount)
+            newIndex = min(filteredPhotos.count - 1, currentIndex + columnsCount)
         case .return:
             // Enter key: Open selected photos in external app
             if selectedPhotos.count > 1 {
@@ -395,16 +395,16 @@ struct ThumbGridView: View {
         if newIndex != currentIndex {
             // Clear multi-selection when navigating with arrow keys
             selectedPhotos.removeAll()
-            selectedPhotos.insert(photos[newIndex].id)
+            selectedPhotos.insert(filteredPhotos[newIndex].id)
 
-            model.selectedPhoto = photos[newIndex]
+            model.selectedPhoto = filteredPhotos[newIndex]
             lastSelectedIndex = newIndex
 
             // Auto-scroll only when moving vertically and reaching visible edges
             if keyPress.key == .upArrow || keyPress.key == .downArrow {
                 let currentRow = currentIndex / columnsCount
                 let newRow = newIndex / columnsCount
-                let totalRows = (photos.count + columnsCount - 1) / columnsCount
+                let totalRows = (filteredPhotos.count + columnsCount - 1) / columnsCount
 
                 if newRow != currentRow && newRow != lastScrolledRow {
                     let thumbnailHeight: CGFloat = 150 + 8
@@ -428,7 +428,7 @@ struct ThumbGridView: View {
                     if isApproachingTop || isApproachingBottom || (shouldPeriodicScroll && totalRows > visibleRows * 2) {
                         lastScrolledRow = newRow
                         withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(photos[newIndex].id, anchor: UnitPoint.center)
+                            proxy.scrollTo(filteredPhotos[newIndex].id, anchor: UnitPoint.center)
                         }
                     }
                 }
