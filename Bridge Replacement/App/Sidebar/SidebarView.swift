@@ -18,24 +18,70 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Main folder list
-            List(selection: $model.selectedFolder) {
-                ForEach(model.rootFolders) { rootFolder in
-                    FolderRowView(
-                        folder: rootFolder,
-                        expandedFolders: $expandedFolders,
-                        selectedFolder: $model.selectedFolder,
-                        saveExpandedState: saveExpandedState,
-                        onDoubleClick: {
-                            onDoubleClick?()
-                        },
-                        model: model
-                    )
+            // Main folder list or welcome screen
+            if model.rootFolders.isEmpty {
+                // Welcome screen when no folders are added
+                VStack(spacing: 16) {
+                    Spacer()
+
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+
+                    VStack(spacing: 8) {
+                        Text("Add Photo Folders")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Text("This is where you add folders containing photos you want to view and organize.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                    }
+
+                    Button(action: {
+                        showingFolderPicker = true
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("Add Folder")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.accentColor)
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Spacer().frame(height: 100)
+
+                    Spacer()
                 }
-                .onDelete(perform: deleteFolders)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Normal folder list
+                List(selection: $model.selectedFolder) {
+                    ForEach(model.rootFolders) { rootFolder in
+                        FolderRowView(
+                            folder: rootFolder,
+                            expandedFolders: $expandedFolders,
+                            selectedFolder: $model.selectedFolder,
+                            saveExpandedState: saveExpandedState,
+                            onDoubleClick: {
+                                onDoubleClick?()
+                            },
+                            model: model
+                        )
+                    }
+                    .onDelete(perform: deleteFolders)
+                }
+                .listStyle(.sidebar)
+                .focusable(false)
             }
-            .listStyle(.sidebar)
-            .focusable(false)
 
             // Bottom bar with add and remove buttons
             HStack {

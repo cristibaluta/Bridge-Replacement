@@ -60,24 +60,32 @@ struct ContentView: View {
     }
 
     var body: some View {
-        navigationSplitView
-            .navigationTitle(navigationTitle)
-            .onChange(of: columnVisibilityStorage) { _, newValue in
-                // Update our tracked state when the column visibility changes
-                isSidebarCollapsed = (newValue == "doubleColumn")
-            }
-            .toolbar {
-                toolbarContent
-            }
-            .onAppear {
-                loadPhotoApps() // Load photo apps first
-                // loadSelectedApp is now called from within loadPhotoApps after discovery completes
+        // Show splash screen if no folders are added
+        if model.rootFolders.isEmpty {
+            SplashScreenView(model: model)
+                .frame(minWidth: 800, minHeight: 600)
+                .preferredColorScheme(.dark)
+        } else {
+            // Normal app interface when folders exist
+            navigationSplitView
+                .navigationTitle(navigationTitle)
+                .onChange(of: columnVisibilityStorage) { _, newValue in
+                    // Update our tracked state when the column visibility changes
+                    isSidebarCollapsed = (newValue == "doubleColumn")
+                }
+                .toolbar {
+                    toolbarContent
+                }
+                .onAppear {
+                    loadPhotoApps() // Load photo apps first
+                    // loadSelectedApp is now called from within loadPhotoApps after discovery completes
 
-                // Set initial sidebar collapsed state based on restored column visibility
-                isSidebarCollapsed = (columnVisibilityStorage == "doubleColumn")
-            }
-            .frame(minWidth: 1200, minHeight: 700)
-            .preferredColorScheme(.dark)
+                    // Set initial sidebar collapsed state based on restored column visibility
+                    isSidebarCollapsed = (columnVisibilityStorage == "doubleColumn")
+                }
+                .frame(minWidth: 1200, minHeight: 700)
+                .preferredColorScheme(.dark)
+        }
     }
 
     private var navigationTitle: String {
