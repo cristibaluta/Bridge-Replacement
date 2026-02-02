@@ -400,38 +400,9 @@ struct ThumbGridView: View {
             model.selectedPhoto = filteredPhotos[newIndex]
             lastSelectedIndex = newIndex
 
-            // Auto-scroll only when moving vertically and reaching visible edges
-            if keyPress.key == .upArrow || keyPress.key == .downArrow {
-                let currentRow = currentIndex / columnsCount
-                let newRow = newIndex / columnsCount
-                let totalRows = (filteredPhotos.count + columnsCount - 1) / columnsCount
-
-                if newRow != currentRow && newRow != lastScrolledRow {
-                    let thumbnailHeight: CGFloat = 150 + 8
-                    let visibleRows = Int(viewportHeight / thumbnailHeight)
-
-                    // Only scroll when we have enough content to warrant scrolling
-                    guard totalRows > visibleRows else { return .handled }
-
-                    // Calculate approximate visible range (this is simplified but effective)
-                    let middleRow = totalRows / 2
-                    let scrollTriggerDistance = visibleRows / 3 // Trigger when 1/3 from edge
-
-                    // Check if we're approaching edges of the entire dataset
-                    // This will effectively scroll when reaching visible viewport edges
-                    let isApproachingTop = newRow < scrollTriggerDistance
-                    let isApproachingBottom = newRow > (totalRows - scrollTriggerDistance)
-
-                    // Also scroll periodically to keep selection visible in large datasets
-                    let shouldPeriodicScroll = abs(newRow - middleRow) % (visibleRows - 1) == 0
-
-                    if isApproachingTop || isApproachingBottom || (shouldPeriodicScroll && totalRows > visibleRows * 2) {
-                        lastScrolledRow = newRow
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(filteredPhotos[newIndex].id, anchor: UnitPoint.center)
-                        }
-                    }
-                }
+            // Auto-scroll to keep selected photo visible
+            withAnimation(.easeInOut(duration: 0.3)) {
+                proxy.scrollTo(filteredPhotos[newIndex].id, anchor: .center)
             }
 
             return .handled
@@ -751,6 +722,7 @@ struct ThumbGridView: View {
             sortOption = option
         }
     }
+
 }
 
 struct ViewOffsetKey: PreferenceKey {
