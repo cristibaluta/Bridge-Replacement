@@ -118,13 +118,22 @@ struct ReviewModeView: View {
             // Top overlay with photo info and exit button
             VStack {
                 HStack {
-                    // Photo info
+                    // Photo info with filename and colored label background
                     if let photo = currentPhoto {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            // Filename with colored label background (like ThumbCell)
                             Text(URL(fileURLWithPath: photo.path).lastPathComponent)
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(getLabelTextColor(for: photo))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(getLabelBackgroundColor(for: photo))
+                                        .opacity(hasLabel(photo: photo) ? 1 : 0)
+                                )
 
+                            // Photo position indicator
                             Text("\(currentIndex + 1) of \(photos.count)")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.7))
@@ -148,16 +157,6 @@ struct ReviewModeView: View {
                 .padding(.top, 20)
 
                 Spacer()
-            }
-
-            // Bottom overlay with label indicators
-            VStack {
-                Spacer()
-
-                if let photo = currentPhoto {
-                    ReviewModeLabels(photo: photo)
-                        .padding(.bottom, 30)
-                }
             }
         }
         .focusable()
@@ -287,6 +286,41 @@ struct ReviewModeView: View {
 
         onUpdatePhoto(photo, updatedXmp)
     }
+
+    // MARK: - Label Color Helper Methods
+
+    private func hasLabel(photo: PhotoItem) -> Bool {
+        return photo.toDelete || (photo.xmp?.label != nil && !photo.xmp!.label!.isEmpty)
+    }
+
+    private func getLabelBackgroundColor(for photo: PhotoItem) -> Color {
+        if photo.toDelete {
+            return .orange
+        }
+
+        guard let label = photo.xmp?.label, !label.isEmpty else {
+            return .clear
+        }
+
+        switch label {
+        case "Red": return .red
+        case "Yellow": return .yellow
+        case "Green": return .green
+        case "Blue": return .blue
+        case "Purple": return .purple
+        default: return .gray
+        }
+    }
+
+    private func getLabelTextColor(for photo: PhotoItem) -> Color {
+        if hasLabel(photo: photo) {
+            // Use white text on colored backgrounds for better readability
+            return .white
+        } else {
+            // Use white text when no background
+            return .white
+        }
+    }
 }
 // MARK: - Supporting Views
 
@@ -329,6 +363,24 @@ struct CarouselMainPhoto: View {
                         .tint(.white)
                 )
         }
+        .overlay(
+            // Trash icon overlay for photos marked for deletion
+            Group {
+                if photo.toDelete {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "trash")
+                                .font(.system(size: 60, weight: .bold))
+                                .foregroundColor(.orange)
+                                .shadow(color: .black, radius: 4, x: 2, y: 2)
+                                .padding(30)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+        )
     }
 }
 
