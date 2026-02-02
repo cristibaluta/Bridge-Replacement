@@ -37,7 +37,7 @@ struct SidebarView: View {
             .listStyle(.sidebar)
             .focusable(false)
 
-            // Bottom bar with add button
+            // Bottom bar with add and remove buttons
             HStack {
                 Button(action: {
                     showingFolderPicker = true
@@ -46,9 +46,32 @@ struct SidebarView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.primary)
                         .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
+                .frame(width: 24, height: 32)
+                .contentShape(Rectangle())
                 .help("Add folder")
+
+                Button(action: {
+                    if let selectedFolder = model.selectedFolder {
+                        // Only remove if the selected folder is a root folder
+                        if isRootFolder(selectedFolder.url) {
+                            model.removeFolder(at: selectedFolder.url)
+                        }
+                    }
+                }) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(isRootFolderSelected() ? .primary : .secondary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PlainButtonStyle())
+                .frame(width: 24, height: 32)
+                .contentShape(Rectangle())
+                .disabled(!isRootFolderSelected())
+                .help("Remove folder")
 
                 Spacer()
 
@@ -56,8 +79,8 @@ struct SidebarView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
             .background(Color(NSColor.controlBackgroundColor))
         }
         .onAppear {
@@ -138,5 +161,25 @@ struct SidebarView: View {
             let folder = model.rootFolders[index]
             model.removeFolder(at: folder.url)
         }
+    }
+
+    private func isDescendant(_ childURL: URL, of parentFolder: FolderItem) -> Bool {
+        if let children = parentFolder.children {
+            for child in children {
+                if child.url == childURL || isDescendant(childURL, of: child) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private func isRootFolder(_ url: URL) -> Bool {
+        return model.rootFolders.contains { $0.url == url }
+    }
+
+    private func isRootFolderSelected() -> Bool {
+        guard let selectedFolder = model.selectedFolder else { return false }
+        return isRootFolder(selectedFolder.url)
     }
 }
