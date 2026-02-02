@@ -125,7 +125,7 @@ func loadPhotos(in folder: FolderItem?) -> [PhotoItem] {
 
 @MainActor
 final class BrowserModel: ObservableObject {
-    @Published var rootFolders: [FolderItem]
+    @Published var rootFolders: [FolderItem] = []
     @Published var selectedFolder: FolderItem? {
         didSet {
             // Stop any pending thumbnail requests for the previous folder
@@ -136,14 +136,52 @@ final class BrowserModel: ObservableObject {
     @Published var selectedPhoto: PhotoItem?
     @Published var photos: [PhotoItem] = []
 
-    init() {
-        let homeURL = FileManager.default.homeDirectoryForCurrentUser
-        let volumesURL = URL(fileURLWithPath: "/Volumes")
+    private let userFoldersKey = "UserManagedFolders"
 
-        self.rootFolders = [
-            loadFolderTree(at: volumesURL, maxDepth: 1), // Only 1 level for volumes to avoid scanning large drives
-            loadFolderTree(at: homeURL, maxDepth: 2)     // 2 levels for home directory
-        ]
+    init() {
+        loadUserFolders()
+    }
+
+    func addFolder(at url: URL) {
+        // Check if folder already exists
+        if rootFolders.contains(where: { $0.url == url }) {
+            return
+        }
+
+        // Load the folder tree and add to root folders
+        let newFolder = loadFolderTree(at: url, maxDepth: 2)
+        rootFolders.append(newFolder)
+
+        // Save to UserDefaults
+        saveUserFolders()
+    }
+
+    func removeFolder(at url: URL) {
+        rootFolders.removeAll { $0.url == url }
+        saveUserFolders()
+    }
+
+    private func loadUserFolders() {
+        if let data = UserDefaults.standard.data(forKey: userFoldersKey),
+           let urls = try? JSONDecoder().decode([URL].self, from: data) {
+
+            // Load folder trees for each saved URL
+            for url in urls {
+                // Verify the folder still exists before adding it
+                if FileManager.default.fileExists(atPath: url.path) {
+                    let folderTree = loadFolderTree(at: url, maxDepth: 2)
+                    rootFolders.append(folderTree)
+                }
+            }
+        }
+        // On fresh install, show no folders - user must add them manually
+    }
+
+    private func saveUserFolders() {
+        let urls = rootFolders.map { $0.url }
+        if let data = try? JSONEncoder().encode(urls) {
+            UserDefaults.standard.set(data, forKey: userFoldersKey)
+        }
     }
 
     func loadChildrenOnDemand(for folder: FolderItem) {

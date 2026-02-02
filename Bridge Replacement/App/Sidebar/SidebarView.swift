@@ -10,34 +10,76 @@ import SwiftUI
 struct SidebarView: View {
     @ObservedObject var model: BrowserModel
     @State private var expandedFolders: Set<URL> = []
+    @State private var showingFolderPicker = false
     let onDoubleClick: (() -> Void)?
 
     private let expandedFoldersKey = "ExpandedFolders"
     private let selectedFolderKey = "SelectedFolder"
 
     var body: some View {
-        List(selection: $model.selectedFolder) {
-            ForEach(model.rootFolders) { rootFolder in
-                FolderRowView(
-                    folder: rootFolder,
-                    expandedFolders: $expandedFolders,
-                    selectedFolder: $model.selectedFolder,
-                    saveExpandedState: saveExpandedState,
-                    onDoubleClick: {
-                        onDoubleClick?()
-                    },
-                    model: model
-                )
+        VStack(spacing: 0) {
+            // Main folder list
+            List(selection: $model.selectedFolder) {
+                ForEach(model.rootFolders) { rootFolder in
+                    FolderRowView(
+                        folder: rootFolder,
+                        expandedFolders: $expandedFolders,
+                        selectedFolder: $model.selectedFolder,
+                        saveExpandedState: saveExpandedState,
+                        onDoubleClick: {
+                            onDoubleClick?()
+                        },
+                        model: model
+                    )
+                }
+                .onDelete(perform: deleteFolders)
             }
+            .listStyle(.sidebar)
+            .focusable(false)
+
+            // Bottom bar with add button
+            HStack {
+                Button(action: {
+                    showingFolderPicker = true
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.primary)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("Add folder")
+
+                Spacer()
+
+                Text("\(model.rootFolders.count) folders")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color(NSColor.controlBackgroundColor))
         }
-        .listStyle(.sidebar)
-        .focusable(false)
         .onAppear {
             loadExpandedState()
             loadSelectedFolder()
         }
         .onChange(of: model.selectedFolder) { _, newValue in
             saveSelectedFolder(newValue)
+        }
+        .fileImporter(
+            isPresented: $showingFolderPicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    model.addFolder(at: url)
+                }
+            case .failure(let error):
+                print("Failed to select folder: \(error)")
+            }
         }
     }
 
@@ -89,5 +131,12 @@ struct SidebarView: View {
         }
 
         return nil
+    }
+
+    private func deleteFolders(offsets: IndexSet) {
+        for index in offsets {
+            let folder = model.rootFolders[index]
+            model.removeFolder(at: folder.url)
+        }
     }
 }
