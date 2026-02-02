@@ -87,7 +87,7 @@ struct ContentView: View {
                             // Set initial sidebar collapsed state based on restored column visibility
                             isSidebarCollapsed = (columnVisibilityStorage == "doubleColumn")
                         }
-                        .frame(minWidth: 1200, minHeight: 700)
+                        .frame(minWidth: 1200, minHeight: 800)
                         .preferredColorScheme(.dark)
                         .focusable()
                         .onKeyPress { keyPress in
@@ -227,7 +227,7 @@ struct ContentView: View {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.up.forward.app")
                     .font(.system(size: 12, weight: .medium))
-                Text(selectedApp?.displayName ?? "Select App")
+                Text(selectedApp?.displayName ?? "Default App")
             }
             .foregroundColor(model.selectedPhoto != nil ? .primary : .secondary)
         }

@@ -17,12 +17,12 @@ struct SplashScreenView: View {
             
             // App icon/logo area
             VStack(spacing: 20) {
-                Image(systemName: "photo.on.rectangle.angled")
+                Image("Logo")
                     .font(.system(size: 80, weight: .light))
                     .foregroundColor(.accentColor)
                 
                 VStack(spacing: 8) {
-                    Text("Bridge Replacement")
+                    Text("Bridge")
                         .font(.largeTitle)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
@@ -35,23 +35,12 @@ struct SplashScreenView: View {
             
             // Welcome content
             VStack(spacing: 24) {
-                VStack(spacing: 12) {
-                    Text("Welcome to Bridge Replacement")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    VStack(spacing: 8) {
-                        Text("To get started, add folders containing your photos.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                        
-                        Text("Browse, organize, label and rate your photos with ease.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                    }
-                    .multilineTextAlignment(.center)
+                VStack(spacing: 8) {
+                    Text("To get started, add folders containing your photos. RAW files, JPEG, and other formats are supported")
+                        .font(.body)
+                        .foregroundColor(.secondary)
                 }
+                .multilineTextAlignment(.center)
                 
                 // Call to action button
                 Button(action: {
@@ -82,15 +71,9 @@ struct SplashScreenView: View {
             Spacer()
             
             // Footer
-            VStack(spacing: 4) {
-                Text("Tip: You can add multiple photo folders or directly your Photos root folder")
-                    .font(.caption)
-                    .foregroundColor(.primary)
-
-                Text("RAW files, JPEG, and other formats are supported")
-                    .font(.caption)
-                    .foregroundColor(.primary)
-            }
+            Text("Tip: You can add multiple photo folders or directly your Photos root folder")
+                .font(.caption)
+                .foregroundColor(.primary)
             .multilineTextAlignment(.center)
             
             Spacer().frame(height: 40)
@@ -112,9 +95,4 @@ struct SplashScreenView: View {
             }
         }
     }
-}
-
-#Preview {
-    SplashScreenView(model: BrowserModel())
-        .frame(width: 800, height: 600)
 }
