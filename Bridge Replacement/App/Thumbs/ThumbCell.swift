@@ -106,14 +106,21 @@ struct ThumbCell: View {
             return
         }
 
-        // Load asynchronously (from disk cache or generate new)
+        // Load asynchronously with high priority (since cell is visible)
         isLoading = true
-        ThumbsManager.shared.loadThumbnail(for: photo.path) { [photo] image in
-            // Ensure we're updating the right cell
-            guard self.photo.path == photo.path else { return }
+        let photoId = photo.id // Capture the ID to avoid memory issues
+        let photoPath = photo.path // Capture the path
 
-            self.thumbnailImage = image
-            self.isLoading = false
+        ThumbsManager.shared.loadThumbnail(for: photoPath, priority: .high) { image in
+            // Use DispatchQueue.main.async to ensure UI updates happen on main thread
+            // and check that this is still the correct cell by comparing photo ID
+            DispatchQueue.main.async {
+                // Only update if this cell is still showing the same photo
+                if self.photo.id == photoId {
+                    self.thumbnailImage = image
+                    self.isLoading = false
+                }
+            }
         }
     }
 

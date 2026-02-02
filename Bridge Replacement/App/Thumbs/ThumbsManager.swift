@@ -9,13 +9,83 @@ import Foundation
 import AppKit
 import CryptoKit
 
+// MARK: - Supporting Data Structures
+
+struct CacheEntry {
+    let image: NSImage
+    let lastAccessed: Date
+}
+
+struct ThumbnailRequest: Comparable {
+    let id: UUID = UUID()
+    let path: String
+    let cacheKey: String
+    let priority: Priority
+    let timestamp: Date = Date()
+    let completion: (NSImage?) -> Void
+    
+    enum Priority: Int, Comparable {
+        case high = 3    // Currently visible
+        case medium = 2  // Near viewport
+        case low = 1     // Background/prefetch
+        
+        static func < (lhs: Priority, rhs: Priority) -> Bool {
+            return lhs.rawValue < rhs.rawValue
+        }
+    }
+    
+    static func < (lhs: ThumbnailRequest, rhs: ThumbnailRequest) -> Bool {
+        if lhs.priority == rhs.priority {
+            return lhs.timestamp < rhs.timestamp
+        }
+        return lhs.priority > rhs.priority // Higher priority first
+    }
+    
+    static func == (lhs: ThumbnailRequest, rhs: ThumbnailRequest) -> Bool {
+        return lhs.id == rhs.id
+    }
+}
+
+struct PriorityQueue<Element: Comparable> {
+    private var elements: [Element] = []
+    
+    var isEmpty: Bool {
+        return elements.isEmpty
+    }
+    
+    var count: Int {
+        return elements.count
+    }
+    
+    mutating func enqueue(_ element: Element) {
+        elements.append(element)
+        elements.sort() // Simple sort for now, could be optimized with heap
+    }
+    
+    mutating func dequeue() -> Element? {
+        return elements.isEmpty ? nil : elements.removeLast()
+    }
+    
+    mutating func removeAll() {
+        elements.removeAll()
+    }
+}
+
 class ThumbsManager: ObservableObject {
     static let shared = ThumbsManager()
 
-    // Memory cache for loaded thumbnails
-    private var memoryCache: [String: NSImage] = [:]
+    // Memory cache with LRU eviction
+    private var memoryCache: [String: CacheEntry] = [:]
+    private var cacheAccessOrder: [String] = []
+    private let maxMemoryCacheSize = 200 // Maximum number of images in memory
     private let cacheQueue = DispatchQueue(label: "ro.imagin.thumbs.cache", attributes: .concurrent)
     private let diskQueue = DispatchQueue(label: "r.imagin.thumbs.disk", qos: .userInitiated)
+    
+    // Priority queue for thumbnail generation
+    private var pendingRequests: [String: ThumbnailRequest] = [:]
+    private var priorityQueue = PriorityQueue<ThumbnailRequest>()
+    private let requestQueue = DispatchQueue(label: "ro.imagin.thumbs.requests")
+    private var isProcessingQueue = false
 
     // Cache directory
     private let cacheDirectory: URL
@@ -33,9 +103,9 @@ class ThumbsManager: ObservableObject {
 
     // MARK: - Public Interface
 
-    /// Load thumbnail for given file path
+    /// Load thumbnail with priority for given file path
     /// Returns cached image immediately if available, otherwise loads asynchronously
-    func loadThumbnail(for path: String, completion: @escaping (NSImage?) -> Void) {
+    func loadThumbnail(for path: String, priority: ThumbnailRequest.Priority = .medium, completion: @escaping (NSImage?) -> Void) {
         let cacheKey = cacheKey(for: path)
 
         // 1. Check memory cache first
@@ -46,21 +116,38 @@ class ThumbsManager: ObservableObject {
             return
         }
 
-        // 2. Check disk cache
-        diskQueue.async { [weak self] in
+        // 2. Check if request is already pending
+        requestQueue.async { [weak self] in
             guard let self = self else { return }
-
-            if let diskImage = self.loadFromDisk(cacheKey: cacheKey, forPath: path) {
-                self.setCachedImage(diskImage, for: cacheKey)
-                DispatchQueue.main.async {
-                    completion(diskImage)
+            
+            // Cancel existing request with lower priority
+            if let existingRequest = self.pendingRequests[cacheKey] {
+                if existingRequest.priority.rawValue < priority.rawValue {
+                    self.pendingRequests.removeValue(forKey: cacheKey)
+                } else {
+                    // Higher or equal priority request already exists
+                    return
                 }
-                return
             }
-
-            // 3. Generate from RAW file
-            self.generateThumbnail(for: path, cacheKey: cacheKey, completion: completion)
+            
+            // Create new request
+            let request = ThumbnailRequest(
+                path: path,
+                cacheKey: cacheKey,
+                priority: priority,
+                completion: completion
+            )
+            
+            self.pendingRequests[cacheKey] = request
+            self.priorityQueue.enqueue(request)
+            
+            self.processQueue()
         }
+    }
+
+    /// Load thumbnail for given file path (legacy method for compatibility)
+    func loadThumbnail(for path: String, completion: @escaping (NSImage?) -> Void) {
+        loadThumbnail(for: path, priority: .medium, completion: completion)
     }
 
     /// Synchronous version for immediate use (checks memory cache only)
@@ -68,17 +155,38 @@ class ThumbsManager: ObservableObject {
         let cacheKey = cacheKey(for: path)
         return getCachedImage(for: cacheKey)
     }
+    
+    /// Cancel pending requests for paths no longer visible
+    func cancelRequests(for paths: [String]) {
+        requestQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            for path in paths {
+                let cacheKey = self.cacheKey(for: path)
+                self.pendingRequests.removeValue(forKey: cacheKey)
+            }
+            
+            // Rebuild priority queue without cancelled requests
+            var newQueue = PriorityQueue<ThumbnailRequest>()
+            for request in self.pendingRequests.values {
+                newQueue.enqueue(request)
+            }
+            self.priorityQueue = newQueue
+        }
+    }
 
     /// Clear memory cache
     func clearMemoryCache() {
-        cacheQueue.async(flags: .barrier) {
-            self.memoryCache.removeAll()
+        cacheQueue.async(flags: .barrier) { [weak self] in
+            self?.memoryCache.removeAll()
+            self?.cacheAccessOrder.removeAll()
         }
     }
 
     /// Clear disk cache
     func clearDiskCache() {
-        diskQueue.async {
+        diskQueue.async { [weak self] in
+            guard let self = self else { return }
             try? FileManager.default.removeItem(at: self.cacheDirectory)
             try? FileManager.default.createDirectory(at: self.cacheDirectory,
                                                    withIntermediateDirectories: true)
@@ -112,13 +220,98 @@ class ThumbsManager: ObservableObject {
 
     private func getCachedImage(for cacheKey: String) -> NSImage? {
         return cacheQueue.sync {
-            return memoryCache[cacheKey]
+            guard let entry = memoryCache[cacheKey] else { return nil }
+            
+            // Update access order for LRU
+            updateAccessOrder(for: cacheKey)
+            
+            return entry.image
         }
     }
 
     private func setCachedImage(_ image: NSImage, for cacheKey: String) {
-        cacheQueue.async(flags: .barrier) {
-            self.memoryCache[cacheKey] = image
+        cacheQueue.async(flags: .barrier) { [weak self] in
+            guard let self = self else { return }
+            
+            let entry = CacheEntry(image: image, lastAccessed: Date())
+            self.memoryCache[cacheKey] = entry
+            self.updateAccessOrder(for: cacheKey)
+            
+            // Enforce cache size limit with LRU eviction
+            self.evictIfNeeded()
+        }
+    }
+
+    private func updateAccessOrder(for cacheKey: String) {
+        // Remove from current position
+        cacheAccessOrder.removeAll { $0 == cacheKey }
+        // Add to end (most recently used)
+        cacheAccessOrder.append(cacheKey)
+    }
+
+    private func evictIfNeeded() {
+        while memoryCache.count > maxMemoryCacheSize && !cacheAccessOrder.isEmpty {
+            let lruKey = cacheAccessOrder.removeFirst()
+            memoryCache.removeValue(forKey: lruKey)
+        }
+    }
+
+    private func processQueue() {
+        guard !isProcessingQueue else { return }
+        isProcessingQueue = true
+        
+        requestQueue.async { [weak self] in
+            self?.processNextRequest()
+        }
+    }
+
+    private func processNextRequest() {
+        requestQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            while let request = self.priorityQueue.dequeue() {
+                // Check if request is still valid (not cancelled)
+                guard self.pendingRequests[request.cacheKey]?.id == request.id else {
+                    continue
+                }
+                
+                // Remove from pending requests
+                self.pendingRequests.removeValue(forKey: request.cacheKey)
+                
+                // Process the request
+                self.processRequest(request)
+                
+                // Small delay to prevent overwhelming the system during fast scrolling
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            
+            self.isProcessingQueue = false
+        }
+    }
+
+    private func processRequest(_ request: ThumbnailRequest) {
+        // First check disk cache
+        if let diskImage = loadFromDisk(cacheKey: request.cacheKey, forPath: request.path) {
+            setCachedImage(diskImage, for: request.cacheKey)
+            DispatchQueue.main.async {
+                request.completion(diskImage)
+            }
+            return
+        }
+
+        // Generate thumbnail from source
+        generateThumbnail(for: request.path, cacheKey: request.cacheKey) { [weak self] image in
+            guard let image = image else {
+                DispatchQueue.main.async {
+                    request.completion(nil)
+                }
+                return
+            }
+            
+            self?.setCachedImage(image, for: request.cacheKey)
+            DispatchQueue.main.async {
+                request.completion(image)
+            }
         }
     }
 
@@ -166,9 +359,7 @@ class ThumbsManager: ObservableObject {
             // Generate thumbnail from RAW file using RawWrapper
             print("Generate RAW thumbnail for: \(path)")
             guard let data = RawWrapper.shared().extractEmbeddedJPEG(path) else {
-                DispatchQueue.main.async {
-                    completion(nil)
-                }
+                completion(nil)
                 return
             }
             originalImage = NSImage(data: data)
@@ -179,24 +370,17 @@ class ThumbsManager: ObservableObject {
         }
 
         guard let image = originalImage else {
-            DispatchQueue.main.async {
-                completion(nil)
-            }
+            completion(nil)
             return
         }
 
         let thumbnail = image.resized(maxSize: thumbSize)
 
-        // Cache in memory
-        setCachedImage(thumbnail, for: cacheKey)
-
         // Save to disk
         saveToDisk(thumbnail, cacheKey: cacheKey, forPath: path)
 
         // Return result
-        DispatchQueue.main.async {
-            completion(thumbnail)
-        }
+        completion(thumbnail)
     }
 }
 
