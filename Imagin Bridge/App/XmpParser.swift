@@ -25,7 +25,7 @@ struct XmpMetadata: Equatable, Hashable {
 
 class XmpParser {
 
-    let xmpTemplate = """
+    static let xmpTemplate = """
         <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 0000/00/00-00:00:00">
          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
           <rdf:Description rdf:about=""
@@ -41,11 +41,11 @@ class XmpParser {
             xmlns:crd="http://ns.adobe.com/camera-raw-defaults/1.0/"
             xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
            xmp:Rating="0"
-           xmp:CreatorTool="ILCE-7M3 v3.00"
+           xmp:CreatorTool=""
            xmp:ModifyDate="2025-11-02T13:35:36+03:00"
            xmp:CreateDate="2025-11-02T13:35:36+03:00"
            xmp:MetadataDate="2026-02-02T00:43:19+02:00"
-           xmp:Label="Approved">
+           xmp:Label="">
           </rdf:Description>
          </rdf:RDF>
         </x:xmpmeta>
@@ -204,29 +204,28 @@ class XmpParser {
     private static func updateXmpAttribute(in xmpContent: String, attribute: String, value: String) -> String {
         var modifiedContent = xmpContent
 
-        // Find the rdf:Description element
-        guard let descriptionRange = modifiedContent.range(of: "<rdf:Description") else {
-            return xmpContent
-        }
-
         // Check if attribute already exists
-        let attributePattern = "\(attribute)\\s*=\\s*\"[^\"]*\""
+        let attributePattern = "\(NSRegularExpression.escapedPattern(for: attribute))\\s*=\\s*\"[^\"]*\""
         let attributeRegex = try? NSRegularExpression(pattern: attributePattern, options: [])
         let nsString = modifiedContent as NSString
         let searchRange = NSRange(location: 0, length: nsString.length)
 
         if let match = attributeRegex?.firstMatch(in: modifiedContent, options: [], range: searchRange),
            let matchRange = Range(match.range, in: modifiedContent) {
-            // Replace existing attribute
+            // Replace existing attribute value, preserving position and structure
             modifiedContent.replaceSubrange(matchRange, with: "\(attribute)=\"\(value)\"")
         } else {
-            // Add new attribute - find the end of the opening rdf:Description tag
+            // Attribute doesn't exist - add it before the closing > of rdf:Description
+            guard let descriptionRange = modifiedContent.range(of: "<rdf:Description") else {
+                return xmpContent
+            }
+
             let fromIndex = descriptionRange.upperBound
             guard let endTagRange = modifiedContent[fromIndex...].range(of: ">") else {
                 return xmpContent
             }
 
-            // Insert the new attribute before the closing >
+            // Insert the new attribute before the closing >, maintaining proper formatting
             let insertionPoint = endTagRange.lowerBound
             modifiedContent.insert(contentsOf: "\n           \(attribute)=\"\(value)\"", at: insertionPoint)
         }
@@ -252,26 +251,24 @@ class XmpParser {
         return modifiedContent
     }
 
-    /// Create a new XMP file with the given rating and label
+    /// Create a new XMP file with the given rating and label using the template
     static func createXmpContent(rating: Int = 0, label: String? = nil) -> String {
-        var content = """
-        <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 0000/00/00-00:00:00">
-         <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-          <rdf:Description rdf:about=""
-            xmlns:xmp="http://ns.adobe.com/xap/1.0/"
-           xmp:Rating="\(rating)"
-        """
+        var content = xmpTemplate
 
+        // Update xmp:Rating
+        content = updateXmpAttribute(in: content, attribute: "xmp:Rating", value: "\(rating)")
+
+        // Update xmp:Label if provided
         if let label = label {
-            content += "\n           xmp:Label=\"\(label)\""
+            content = updateXmpAttribute(in: content, attribute: "xmp:Label", value: label)
         }
 
-        content += """
-        >
-          </rdf:Description>
-         </rdf:RDF>
-        </x:xmpmeta>
-        """
+        // Update xmp:MetadataDate with current date
+        let currentDate = Date()
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        let currentDateString = dateFormatter.string(from: currentDate)
+        content = updateXmpAttribute(in: content, attribute: "xmp:MetadataDate", value: currentDateString)
 
         return content
     }

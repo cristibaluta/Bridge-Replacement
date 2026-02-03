@@ -580,38 +580,8 @@ struct ThumbGridView: View {
         } else {
             print("📄 No existing XMP file found, will create new one")
 
-            // Create minimal XMP file with the target label
-            let currentDate = Date()
-            let dateFormatter = ISO8601DateFormatter()
-            dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
-            let currentDateString = dateFormatter.string(from: currentDate)
-            let instanceID = UUID().uuidString.lowercased()
-
-            xmpContent = """
-<?xml version="1.0" encoding="UTF-8"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 0000/00/00-00:00:00        ">
- <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-  <rdf:Description rdf:about=""
-    xmlns:xmp="http://ns.adobe.com/xap/1.0/"
-    xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/"
-    xmlns:stEvt="http://ns.adobe.com/xap/1.0/sType/ResourceEvent#"
-   xmp:Label="\(targetLabel)"
-   xmp:MetadataDate="\(currentDateString)"
-   xmpMM:InstanceID="xmp.iid:\(instanceID)">
-   <xmpMM:History>
-    <rdf:Seq>
-     <rdf:li
-      stEvt:action="saved"
-      stEvt:instanceID="xmp.iid:\(instanceID)"
-      stEvt:when="\(currentDateString)"
-      stEvt:softwareAgent="Imagin Bridge"
-      stEvt:changed="/metadata"/>
-    </rdf:Seq>
-   </xmpMM:History>
-  </rdf:Description>
- </rdf:RDF>
-</x:xmpmeta>
-"""
+            // Create new XMP file using the template with the target label
+            xmpContent = XmpParser.createXmpContent(rating: photo.xmp?.rating ?? 0, label: targetLabel)
             print("🔄 Setting \(targetLabel) label")
         }
 
