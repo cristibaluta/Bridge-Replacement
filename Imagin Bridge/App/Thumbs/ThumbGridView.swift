@@ -4,6 +4,7 @@ struct ThumbGridView: View {
     let photos: [PhotoItem]
     @EnvironmentObject var filesModel: FilesModel
     let selectedApp: PhotoApp?
+    @Binding var gridType: GridType // Accept as binding instead of state
     let onOpenSelectedPhotos: (([PhotoItem]) -> Void)?
     let onEnterReviewMode: (() -> Void)?
     @FocusState private var isFocused: Bool
@@ -14,12 +15,62 @@ struct ThumbGridView: View {
     @State private var sortOption: SortOption = .name
     @State private var selectedPhotos: Set<UUID> = []
     @State private var lastSelectedIndex: Int?
+    @State private var showGridTypePopover = false
 
     private let sortOptionKey = "SelectedSortOption"
+    private let gridTypeKey = "SelectedGridType"
 
     enum SortOption: String, CaseIterable {
         case name = "Name"
         case dateCreated = "Date Created"
+    }
+
+    enum GridType: String, CaseIterable, Identifiable {
+        case twoColumns = "TwoColumns"
+        case threeColumns = "ThreeColumns"
+        case fourColumns = "FourColumns"
+
+        var id: String { self.rawValue }
+
+        var columnCount: Int {
+            switch self {
+            case .twoColumns: return 2
+            case .threeColumns: return 3
+            case .fourColumns: return 4
+            }
+        }
+
+        var thumbSize: CGFloat {
+            switch self {
+            case .twoColumns: return 100
+            case .threeColumns: return 100
+            case .fourColumns: return 200
+            }
+        }
+
+        var cellHeight: CGFloat {
+            switch self {
+            case .twoColumns: return 150  // 100px square thumbnail + 50px for title and rating
+            case .threeColumns: return 150  // 100px square thumbnail + 50px for title and rating
+            case .fourColumns: return 250  // 200px square thumbnail + 50px for title and rating
+            }
+        }
+
+        var displayName: String {
+            switch self {
+            case .twoColumns: return "2 Columns (100px)"
+            case .threeColumns: return "3 Columns (100px)"
+            case .fourColumns: return "4 Columns (200px)"
+            }
+        }
+
+        var iconName: String {
+            switch self {
+            case .twoColumns: return "square.grid.2x2"
+            case .threeColumns: return "square.grid.3x3"
+            case .fourColumns: return "square.grid.4x4.fill"
+            }
+        }
     }
 
     // Computed property for filtered and sorted photos
@@ -63,12 +114,28 @@ struct ThumbGridView: View {
         return result
     }
 
-    let columns = [
-        GridItem(.fixed(108), spacing: 8),
-        GridItem(.fixed(108), spacing: 8),
-        GridItem(.fixed(108), spacing: 8)
-    ]
-    private let columnsCount = 3
+    // Dynamic grid columns based on grid type
+    private var dynamicColumns: [GridItem] {
+        let columnCount = gridType.columnCount
+        let spacing: CGFloat = 8
+        return Array(repeating: GridItem(.flexible(minimum: gridType.thumbSize), spacing: spacing), count: columnCount)
+    }
+
+    // Calculate exact width needed for the grid
+    private var gridWidth: CGFloat {
+        let columnCount = gridType.columnCount
+        let thumbSize = gridType.thumbSize
+        let spacing: CGFloat = 8
+        let horizontalPadding: CGFloat = 8 // 4px padding on each side
+
+        // Width = (number of columns × thumb size) + (spacing between columns) + horizontal padding
+        let totalSpacing = CGFloat(columnCount - 1) * spacing
+        return (CGFloat(columnCount) * thumbSize) + totalSpacing + horizontalPadding
+    }
+
+    private var columnsCount: Int {
+        return gridType.columnCount
+    }
 
     // Get available labels from current photos
     private var availableLabels: [String] {
@@ -170,7 +237,7 @@ struct ThumbGridView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ScrollView(.vertical, showsIndicators: true) {
-                            LazyVGrid(columns: columns, spacing: 8) {
+                            LazyVGrid(columns: dynamicColumns, spacing: 8) {
                                 ForEach(filteredPhotos, id: \.id) { photo in
                                     ThumbCell(
                                         photo: photo,
@@ -190,9 +257,10 @@ struct ThumbGridView: View {
                                         },
                                         onRatingChanged: { rating in
                                             setPhotoRating(photo: photo, rating: rating)
-                                        }
+                                        },
+                                        size: gridType.thumbSize  // Pass the dynamic size
                                     )
-                                    .frame(width: 100, height: 150)
+                                    .frame(width: gridType.thumbSize, height: gridType.cellHeight)
                                     .id(photo.id)
                                 }
                             }
@@ -230,6 +298,25 @@ struct ThumbGridView: View {
             // Filter and Sort bar - only show when there are photos
             if !photos.isEmpty {
                 HStack(spacing: 12) {
+                    // Grid Type button
+                    Button(action: {
+                        showGridTypePopover.toggle()
+                    }) {
+                        Image(systemName: "square.grid.3x3")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.primary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Color.clear)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .popover(isPresented: $showGridTypePopover) {
+                        GridTypePopoverView(gridType: $gridType)
+                    }
+                    .onChange(of: gridType) { _, newValue in
+                        // Grid type persistence is now handled by parent ContentView
+                    }
+
                     // Sort button
                     Button(action: {
                         showSortPopover.toggle()
@@ -316,6 +403,7 @@ struct ThumbGridView: View {
                 .background(Color(NSColor.controlBackgroundColor))
             }
         }
+        .frame(width: gridWidth) // Apply exact width to fit thumbnail columns
     }
 
     private func handlePhotoTap(photo: PhotoItem, modifiers: NSEvent.ModifierFlags) {
@@ -466,7 +554,7 @@ struct ThumbGridView: View {
 
             // Handle both direct key press and Command+key combinations for label keys
             if labelKey == "6" || labelKey == "7" || labelKey == "8" || labelKey == "9" || labelKey == "0" ||
-               (keyPress.modifiers.contains(.command) && (labelKey == "6" || labelKey == "7" || labelKey == "8" || labelKey == "9" || labelKey == "0")) {
+                (keyPress.modifiers.contains(.command) && (labelKey == "6" || labelKey == "7" || labelKey == "8" || labelKey == "9" || labelKey == "0")) {
 
                 if let selectedPhoto = filesModel.selectedPhoto, let label = targetLabel {
                     createAndSaveXmpFile(for: selectedPhoto, targetLabel: label)
@@ -475,8 +563,6 @@ struct ThumbGridView: View {
                 }
                 return .handled
             }
-
-            return .ignored
         }
 
         if newIndex != currentIndex {
@@ -830,7 +916,6 @@ struct ThumbGridView: View {
             sortOption = option
         }
     }
-
 }
 
 struct ViewOffsetKey: PreferenceKey {

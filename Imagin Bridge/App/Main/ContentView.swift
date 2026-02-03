@@ -28,8 +28,22 @@ struct ContentView: View {
     @State private var selectedPhotosCount = 0
     @State private var openSelectedPhotosCallback: (() -> Void)?
     @State private var isReviewModeActive = false
+    @State private var gridType: ThumbGridView.GridType = .threeColumns // Shared grid type state
 
     private let selectedAppKey = "SelectedExternalApp"
+    private let gridTypeKey = "SelectedGridType"
+
+    // Calculate dynamic column width based on grid type
+    private var contentColumnWidth: CGFloat {
+        let columnCount = gridType.columnCount
+        let thumbSize = gridType.thumbSize
+        let spacing: CGFloat = 8
+        let horizontalPadding: CGFloat = 8
+
+        // Width = (number of columns × thumb size) + (spacing between columns) + horizontal padding
+        let totalSpacing = CGFloat(columnCount - 1) * spacing
+        return (CGFloat(columnCount) * thumbSize) + totalSpacing + horizontalPadding
+    }
 
     private var columnVisibility: Binding<NavigationSplitViewVisibility> {
         Binding(
@@ -82,10 +96,14 @@ struct ContentView: View {
                         }
                         .onAppear {
                             loadPhotoApps() // Load photo apps first
+                            loadGridType() // Load saved grid type
                             // loadSelectedApp is now called from within loadPhotoApps after discovery completes
 
                             // Set initial sidebar collapsed state based on restored column visibility
                             isSidebarCollapsed = (columnVisibilityStorage == "doubleColumn")
+                        }
+                        .onChange(of: gridType) { _, newValue in
+                            saveGridType(newValue) // Save grid type changes
                         }
                         .frame(minWidth: 1200, minHeight: 800)
                         .preferredColorScheme(.dark)
@@ -161,15 +179,28 @@ struct ContentView: View {
                 // Double-click callback: collapse sidebar to double column view
                 columnVisibilityStorage = "doubleColumn"
             }
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
         } content: {
             // Middle: thumbnails
-            ThumbGridView(photos: filesModel.photos, selectedApp: selectedApp, onOpenSelectedPhotos: { photos in
-                openMultiplePhotosInExternalApp(photos: photos)
-            }, onEnterReviewMode: {
-                isReviewModeActive = true
-            })
+            ThumbGridView(
+                photos: filesModel.photos,
+                selectedApp: selectedApp,
+                gridType: $gridType, // Pass the binding to share grid type
+                onOpenSelectedPhotos: { photos in
+                    openMultiplePhotosInExternalApp(photos: photos)
+                },
+                onEnterReviewMode: {
+                    isReviewModeActive = true
+                }
+            )
+            .navigationSplitViewColumnWidth(
+                min: contentColumnWidth,
+                ideal: contentColumnWidth,
+                max: contentColumnWidth
+            ) // Dynamic width that prevents resizing
         } detail: {
             detailView
+            .navigationSplitViewColumnWidth(min: 400, ideal: 600)
         }
         .environmentObject(filesModel)
     }
@@ -540,6 +571,19 @@ struct ContentView: View {
             print("🗑️ \(action) photo for deletion: \(photo.path)")
         } else {
             print("⚠️ Photo not found in filesModel: \(photo.path)")
+        }
+    }
+
+    // MARK: - Grid Type Persistence
+
+    private func saveGridType(_ type: ThumbGridView.GridType) {
+        UserDefaults.standard.set(type.rawValue, forKey: gridTypeKey)
+    }
+
+    private func loadGridType() {
+        if let savedType = UserDefaults.standard.string(forKey: gridTypeKey),
+           let type = ThumbGridView.GridType(rawValue: savedType) {
+            gridType = type
         }
     }
 }
