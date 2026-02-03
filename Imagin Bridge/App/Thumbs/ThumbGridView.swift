@@ -298,24 +298,19 @@ struct ThumbGridView: View {
             // Filter and Sort bar - only show when there are photos
             if !photos.isEmpty {
                 HStack(spacing: 12) {
-                    // Grid Type button
+                    // Grid Type button - toggles between 3 and 4 columns
                     Button(action: {
-                        showGridTypePopover.toggle()
+                        // Toggle between 3 columns and 4 columns
+                        gridType = (gridType == .threeColumns) ? .fourColumns : .threeColumns
                     }) {
                         Image(systemName: "square.grid.3x3")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.primary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 0)
+                            .padding(.vertical, 0)
                             .background(Color.clear)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .popover(isPresented: $showGridTypePopover) {
-                        GridTypePopoverView(gridType: $gridType)
-                    }
-                    .onChange(of: gridType) { _, newValue in
-                        // Grid type persistence is now handled by parent ContentView
-                    }
 
                     // Sort button
                     Button(action: {
