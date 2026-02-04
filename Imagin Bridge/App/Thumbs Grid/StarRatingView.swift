@@ -58,12 +58,3 @@ struct StarRatingView: View {
         }
     }
 }
-
-#Preview {
-    VStack(spacing: 20) {
-        StarRatingView(rating: 0, maxRating: 5, starSize: 16) { _ in }
-        StarRatingView(rating: 3, maxRating: 5, starSize: 16) { _ in }
-        StarRatingView(rating: 5, maxRating: 5, starSize: 16) { _ in }
-    }
-    .padding()
-}

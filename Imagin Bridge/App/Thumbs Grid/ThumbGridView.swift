@@ -303,29 +303,24 @@ struct ThumbGridView: View {
                         // Toggle between 3 columns and 4 columns
                         gridType = (gridType == .threeColumns) ? .fourColumns : .threeColumns
                     }) {
-                        Image(systemName: "square.grid.3x3")
+                        Image(systemName: "square.grid.3x3.fill")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.primary)
-                            .padding(.horizontal, 0)
-                            .padding(.vertical, 0)
+                            .padding(0)
                             .background(Color.clear)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .padding(.leading, 8)
 
                     // Sort button
                     Button(action: {
                         showSortPopover.toggle()
                     }) {
-                        Text("Sort")
-                            .font(.caption)
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.primary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .padding(0)
                             .background(Color.clear)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 3)
-                                    .stroke(Color.gray.opacity(0.5), lineWidth: 1)
-                            )
                     }
                     .buttonStyle(PlainButtonStyle())
                     .popover(isPresented: $showSortPopover) {
@@ -336,7 +331,7 @@ struct ThumbGridView: View {
                     }
 
                     // Filter section with unified rounded rectangle
-                    HStack(spacing: 8) {
+                    HStack(spacing: 2) {
                         // Filter button (existing functionality)
                         Button(action: {
                             showFilterPopover.toggle()
@@ -344,6 +339,7 @@ struct ThumbGridView: View {
                             Text("Filter")
                                 .font(.caption)
                                 .foregroundColor(.primary)
+                                .lineLimit(1)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                         }
@@ -363,18 +359,18 @@ struct ThumbGridView: View {
                             }) {
                                 Image(systemName: selectedLabels.contains(label) ? "checkmark.square.fill" : "square")
                                     .foregroundColor(getColorForLabel(label))
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(.system(size: 14, weight: .medium))
                             }
                             .buttonStyle(PlainButtonStyle())
                             .help(label) // Tooltip shows the label name on hover
                         }
                     }
                     .padding(.horizontal, 4)
-                    .background(Color.clear)
                     .overlay(
                         RoundedRectangle(cornerRadius: 3)
                             .stroke(Color.gray.opacity(0.5), lineWidth: 1)
                     )
+                    .layoutPriority(1)
 
                     Spacer()
 
@@ -383,18 +379,23 @@ struct ThumbGridView: View {
                         Text("\(selectedPhotos.count) of \(photos.count) selected")
                             .font(.caption)
                             .foregroundColor(.blue)
+                            .lineLimit(1)
+                            .padding(.trailing, 8)
                     } else if selectedLabels.count > 0 {
                         Text("\(filteredPhotos.count) of \(photos.count) photos")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .padding(.trailing, 8)
                     } else {
                         Text("\(photos.count) photos")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .padding(.trailing, 8)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .frame(height: 40)
                 .background(Color(NSColor.controlBackgroundColor))
             }
         }

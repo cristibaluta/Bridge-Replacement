@@ -81,7 +81,7 @@ struct ContentView: View {
                 // Show splash screen if no folders are added
                 if filesModel.rootFolders.isEmpty {
                     SplashScreenView()
-                        .frame(minWidth: 800, minHeight: 600)
+                        .frame(minWidth: 1200, minHeight: 800)
                         .preferredColorScheme(.dark)
                         .environmentObject(filesModel)
                 } else {
@@ -98,7 +98,6 @@ struct ContentView: View {
                         .onAppear {
                             loadPhotoApps() // Load photo apps first
                             loadGridType() // Load saved grid type
-                            // loadSelectedApp is now called from within loadPhotoApps after discovery completes
 
                             // Set initial sidebar collapsed state based on restored column visibility
                             isSidebarCollapsed = (columnVisibilityStorage == "doubleColumn")
@@ -160,16 +159,8 @@ struct ContentView: View {
         guard let url = navigationDocumentURL else {
             return "Imagin Bridge"
         }
-
-        // Create a breadcrumb-style path
         let pathComponents = url.pathComponents.filter { $0 != "/" }
         let breadcrumb = pathComponents.joined(separator: " › ")
-
-        // Debug output
-        print("Navigation URL: \(url.path)")
-        print("Path components: \(pathComponents)")
-        print("Breadcrumb: \(breadcrumb)")
-
         return breadcrumb.isEmpty ? url.lastPathComponent : breadcrumb
     }
 
@@ -180,7 +171,7 @@ struct ContentView: View {
                 // Double-click callback: collapse sidebar to double column view
                 columnVisibilityStorage = "doubleColumn"
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
+            .navigationSplitViewColumnWidth(min: 150, ideal: 200, max: 300)
         } content: {
             // Middle: thumbnails
             ThumbGridView(
@@ -350,12 +341,6 @@ struct ContentView: View {
 
     private func sharePhoto(_ photo: PhotoItem) {
         let url = URL(fileURLWithPath: photo.path)
-
-        // Use NSSharingService to show the native macOS sharing popover
-        let sharingService = NSSharingService(named: NSSharingService.Name.composeEmail)
-        let sharingServices = NSSharingService.sharingServices(forItems: [url])
-
-        // Create a sharing service picker to show all available sharing options
         let sharingServicePicker = NSSharingServicePicker(items: [url])
 
         // Find the main window to position the popover
@@ -474,38 +459,6 @@ struct ContentView: View {
         }
     }
 
-    private func openWithDiscoveredApp(photo: PhotoItem, app: PhotoApp) {
-        let url = URL(fileURLWithPath: photo.path)
-        let workspace = NSWorkspace.shared
-
-        do {
-            try workspace.open([url], withApplicationAt: app.url, options: [], configuration: [:])
-            print("Opening \(url.lastPathComponent) with \(app.displayName)")
-        } catch {
-            print("Failed to open \(url.lastPathComponent) with \(app.displayName): \(error)")
-            // Fallback to default application
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func openWithSpecificApp(url: URL, app: ExternalApp) -> Bool {
-        let workspace = NSWorkspace.shared
-
-        // Try to find the application bundle
-        guard let appURL = workspace.urlForApplication(withBundleIdentifier: app.bundleID) else {
-            print("App \(app.displayName) not found (Bundle ID: \(app.bundleID))")
-            return false
-        }
-
-        do {
-            try workspace.open([url], withApplicationAt: appURL, options: [], configuration: [:])
-            return true
-        } catch {
-            print("Failed to open \(url.lastPathComponent) with \(app.displayName): \(error)")
-            return false
-        }
-    }
-
     // MARK: - Review Mode Helper Methods
 
     private func handleKeyPress(_ keyPress: KeyPress) -> KeyPress.Result {
@@ -585,31 +538,6 @@ struct ContentView: View {
         if let savedType = UserDefaults.standard.string(forKey: gridTypeKey),
            let type = ThumbGridView.GridType(rawValue: savedType) {
             gridType = type
-        }
-    }
-}
-
-enum ExternalApp: CaseIterable {
-    case photoshop
-    case lightroom
-    case dxo
-    case defaultApp
-
-    var displayName: String {
-        switch self {
-        case .photoshop: return "Adobe Photoshop"
-        case .lightroom: return "Adobe Lightroom"
-        case .dxo: return "DxO PhotoLab"
-        case .defaultApp: return "Default App"
-        }
-    }
-
-    var bundleID: String {
-        switch self {
-        case .photoshop: return "com.adobe.Photoshop"
-        case .lightroom: return "com.adobe.LightroomCC"
-        case .dxo: return "com.dxo.PhotoLab7" // May vary by version
-        case .defaultApp: return "" // Not used for default
         }
     }
 }

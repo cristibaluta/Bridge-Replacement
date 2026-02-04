@@ -37,7 +37,3 @@ struct SortPopoverView: View {
         .frame(minWidth: 200)
     }
 }
-
-#Preview {
-    SortPopoverView(sortOption: .constant(.name))
-}
