@@ -84,6 +84,7 @@ struct ContentView: View {
                     SplashScreenView()
                         .frame(minWidth: 800, minHeight: 600)
                         .preferredColorScheme(.dark)
+                        .environmentObject(filesModel)
                 } else {
                     // Normal app interface when folders exist
                     navigationSplitView
