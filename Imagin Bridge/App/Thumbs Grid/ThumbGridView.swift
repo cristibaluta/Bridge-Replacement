@@ -277,6 +277,7 @@ struct ThumbGridView: View {
                             isFocused = true
                             if filesModel.selectedPhoto == nil && !filteredPhotos.isEmpty {
                                 filesModel.selectedPhoto = filteredPhotos.first
+                                lastSelectedIndex = 0
                                 selectedPhotos.removeAll()
                                 if let firstPhoto = filteredPhotos.first {
                                     selectedPhotos.insert(firstPhoto.id)
