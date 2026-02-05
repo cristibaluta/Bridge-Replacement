@@ -9,61 +9,166 @@ import CoreServices
 
 // MARK: - File Monitoring
 
-class FileSystemMonitor {
-    private var monitoredFolders: [URL: DispatchSourceFileSystemObject] = [:]
-    private let queue = DispatchQueue(label: "file.monitor", qos: .utility)
-    weak var delegate: FileSystemMonitorDelegate?
+// MARK: - File Monitoring
 
-    func startMonitoring(url: URL) {
-        // Don't monitor the same folder twice
-        if monitoredFolders[url] != nil {
-            return
-        }
+// Global callback function for FSEvents
+private func fsEventsCallback(
+    streamRef: ConstFSEventStreamRef,
+    clientCallBackInfo: UnsafeMutableRawPointer?,
+    numEvents: Int,
+    eventPaths: UnsafeMutableRawPointer,
+    eventFlags: UnsafePointer<FSEventStreamEventFlags>,
+    eventIds: UnsafePointer<FSEventStreamEventId>
+) {
+    // Get the monitor ID from the context
+    guard let info = clientCallBackInfo else { return }
+    let monitorId = info.load(as: Int.self)
 
-        let fileDescriptor = open(url.path, O_EVTONLY)
-        guard fileDescriptor >= 0 else {
-            print("Failed to open file descriptor for \(url.path)")
-            return
-        }
+    // Find the monitor in our global registry
+    guard let monitor = FileSystemMonitor.getMonitor(id: monitorId) else { return }
 
-        let source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: fileDescriptor,
-            eventMask: [.write, .rename, .delete],
-            queue: queue
-        )
+    // Handle the eventPaths as CFArray
+    let cfArray = unsafeBitCast(eventPaths, to: CFArray.self)
 
-        source.setEventHandler { [weak self] in
-            let events = source.mask
-            if events.contains(.write) || events.contains(.rename) {
+    for i in 0..<numEvents {
+        if let cfString = CFArrayGetValueAtIndex(cfArray, i) {
+            let pathString = unsafeBitCast(cfString, to: CFString.self) as String
+            let url = URL(fileURLWithPath: pathString)
+
+            if monitor.isRelevantChange(at: url, flags: eventFlags[i]) {
                 Task { @MainActor in
-                    self?.delegate?.folderContentsDidChange(at: url)
+                    monitor.delegate?.folderContentsDidChange(at: url)
                 }
             }
         }
+    }
+}
 
-        source.setCancelHandler {
-            close(fileDescriptor)
+class FileSystemMonitor {
+    private var eventStream: FSEventStreamRef?
+    private var monitoredPaths: [String] = []
+    weak var delegate: FileSystemMonitorDelegate?
+
+    // Global monitor registry
+    private static var nextId = 0
+    private static var monitors: [Int: FileSystemMonitor] = [:]
+    private var monitorId: Int
+
+    init() {
+        FileSystemMonitor.nextId += 1
+        self.monitorId = FileSystemMonitor.nextId
+        FileSystemMonitor.monitors[monitorId] = self
+    }
+
+    static func getMonitor(id: Int) -> FileSystemMonitor? {
+        return monitors[id]
+    }
+
+    func startMonitoring(url: URL) {
+        // Don't monitor the same folder twice
+        if monitoredPaths.contains(url.path) {
+            return
         }
 
-        source.resume()
-        monitoredFolders[url] = source
-        print("Started monitoring folder: \(url.path)")
+        // Stop existing stream if running
+        stopAllMonitoring()
+
+        // Add new path
+        monitoredPaths.append(url.path)
+
+        // Create new stream with all paths
+        startFSEventStream()
+
+        print("Started monitoring folder tree: \(url.path)")
     }
 
     func stopMonitoring(url: URL) {
-        if let source = monitoredFolders.removeValue(forKey: url) {
-            source.cancel()
+        if let index = monitoredPaths.firstIndex(of: url.path) {
+            monitoredPaths.remove(at: index)
             print("Stopped monitoring folder: \(url.path)")
+
+            // Restart stream with remaining paths
+            stopAllMonitoring()
+            if !monitoredPaths.isEmpty {
+                startFSEventStream()
+            }
         }
     }
 
     func stopAllMonitoring() {
-        for (_, source) in monitoredFolders {
-            source.cancel()
+        if let stream = eventStream {
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+            eventStream = nil
         }
-        monitoredFolders.removeAll()
-        print("Stopped all folder monitoring")
     }
+
+    private func startFSEventStream() {
+        guard !monitoredPaths.isEmpty else { return }
+
+        let pathsArray = monitoredPaths as CFArray
+
+        // Create context with monitor ID
+        let contextPtr = UnsafeMutablePointer<Int>.allocate(capacity: 1)
+        contextPtr.pointee = monitorId
+
+        var fsContext = FSEventStreamContext(
+            version: 0,
+            info: UnsafeMutableRawPointer(contextPtr),
+            retain: nil,
+            release: { info in
+                if let ptr = info?.assumingMemoryBound(to: Int.self) {
+                    ptr.deallocate()
+                }
+            },
+            copyDescription: nil
+        )
+
+        eventStream = FSEventStreamCreate(
+            nil,
+            fsEventsCallback,
+            &fsContext,
+            pathsArray,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            1.0,
+            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
+        )
+
+        if let stream = eventStream {
+            FSEventStreamSetDispatchQueue(stream, DispatchQueue.global(qos: .utility))
+            FSEventStreamStart(stream)
+        }
+    }
+
+    func isRelevantChange(at url: URL, flags: FSEventStreamEventFlags) -> Bool {
+        // Check if the change is in one of our monitored paths
+        let pathString = url.path
+        let isInMonitoredPath = monitoredPaths.contains { pathString.hasPrefix($0) }
+
+        // We're interested in directory creation, deletion, or content changes
+        let isDirectoryEvent = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsDir)) != 0
+        let isFileCreated = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemCreated)) != 0
+        let isFileRemoved = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRemoved)) != 0
+        let isFileRenamed = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRenamed)) != 0
+        let isFileModified = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemModified)) != 0
+
+        let isRelevant = isInMonitoredPath && (isDirectoryEvent || isFileCreated || isFileRemoved || isFileRenamed || isFileModified)
+
+        if isRelevant {
+            print("📁 File system change detected:")
+            print("   Path: \(pathString)")
+            print("   Is Directory: \(isDirectoryEvent)")
+            print("   Created: \(isFileCreated)")
+            print("   Removed: \(isFileRemoved)")
+            print("   Renamed: \(isFileRenamed)")
+            print("   Modified: \(isFileModified)")
+        }
+
+        return isRelevant
+    }
+
+    // ...existing isRelevantChange method...
 
     deinit {
         stopAllMonitoring()
@@ -292,11 +397,50 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
     }
 
     private func refreshFolderTree(for changedURL: URL) {
-        // Find the folder in our root folders and refresh it
-        for i in 0..<rootFolders.count {
-            if let updatedFolder = refreshFolderRecursively(folder: rootFolders[i], changedURL: changedURL) {
-                rootFolders[i] = updatedFolder
+        print("Refreshing folder tree for changed URL: \(changedURL.path)")
+
+        // Find the closest monitored parent folder that contains this changed path
+        var refreshURL = changedURL
+        var foundMonitoredParent = false
+
+        // Walk up the directory tree to find a monitored root folder
+        while !foundMonitoredParent && refreshURL.path != "/" {
+            if rootFolders.contains(where: { $0.url.path == refreshURL.path }) {
+                foundMonitoredParent = true
                 break
+            }
+            refreshURL = refreshURL.deletingLastPathComponent()
+        }
+
+        // If we found a monitored parent, refresh from there
+        if foundMonitoredParent {
+            for i in 0..<rootFolders.count {
+                if rootFolders[i].url.path == refreshURL.path {
+                    print("Refreshing root folder: \(refreshURL.path)")
+                    let refreshedTree = loadFolderTree(
+                        at: rootFolders[i].url,
+                        maxDepth: 2,
+                        currentDepth: 0,
+                        bookmarkData: rootFolders[i].bookmarkData
+                    )
+                    rootFolders[i] = refreshedTree
+                    return
+                }
+            }
+        } else {
+            // If no monitored parent found, try to refresh any root folder that might contain this path
+            for i in 0..<rootFolders.count {
+                if changedURL.path.hasPrefix(rootFolders[i].url.path) {
+                    print("Refreshing containing root folder: \(rootFolders[i].url.path)")
+                    let refreshedTree = loadFolderTree(
+                        at: rootFolders[i].url,
+                        maxDepth: 2,
+                        currentDepth: 0,
+                        bookmarkData: rootFolders[i].bookmarkData
+                    )
+                    rootFolders[i] = refreshedTree
+                    return
+                }
             }
         }
     }
