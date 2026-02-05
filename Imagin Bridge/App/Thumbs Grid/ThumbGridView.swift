@@ -481,33 +481,23 @@ struct ThumbGridView: View {
             switch labelKey {
             case "1":
                 // Rating key: Set 1 star
-                if let selectedPhoto = filesModel.selectedPhoto {
-                    setPhotoRating(photo: selectedPhoto, rating: 1)
-                }
+                applyRatingToSelectedPhotos(rating: 1)
                 return .handled
             case "2":
                 // Rating key: Set 2 stars
-                if let selectedPhoto = filesModel.selectedPhoto {
-                    setPhotoRating(photo: selectedPhoto, rating: 2)
-                }
+                applyRatingToSelectedPhotos(rating: 2)
                 return .handled
             case "3":
                 // Rating key: Set 3 stars
-                if let selectedPhoto = filesModel.selectedPhoto {
-                    setPhotoRating(photo: selectedPhoto, rating: 3)
-                }
+                applyRatingToSelectedPhotos(rating: 3)
                 return .handled
             case "4":
                 // Rating key: Set 4 stars
-                if let selectedPhoto = filesModel.selectedPhoto {
-                    setPhotoRating(photo: selectedPhoto, rating: 4)
-                }
+                applyRatingToSelectedPhotos(rating: 4)
                 return .handled
             case "5":
                 // Rating key: Set 5 stars
-                if let selectedPhoto = filesModel.selectedPhoto {
-                    setPhotoRating(photo: selectedPhoto, rating: 5)
-                }
+                applyRatingToSelectedPhotos(rating: 5)
                 return .handled
             case "6":
                 targetLabel = "Select"
@@ -521,27 +511,15 @@ struct ThumbGridView: View {
                 targetLabel = "To Do"
             case "-":
                 // Remove any label (clear label)
-                if let selectedPhoto = filesModel.selectedPhoto {
-                    removeAnyLabel(for: selectedPhoto)
-                } else {
-                    print("DEBUG: No photo selected")
-                }
+                applyLabelRemovalToSelectedPhotos()
                 return .handled
             case "\u{7F}": // Delete key (backspace character)
                 // Toggle "To Delete" state
-                if let selectedPhoto = filesModel.selectedPhoto {
-                    toggleToDeleteState(for: selectedPhoto)
-                } else {
-                    print("DEBUG: No photo selected")
-                }
+                applyDeleteToggleToSelectedPhotos()
                 return .handled
             case "d", "D": // 'd' key for marking for deletion
                 // Toggle "To Delete" state
-                if let selectedPhoto = filesModel.selectedPhoto {
-                    toggleToDeleteState(for: selectedPhoto)
-                } else {
-                    print("DEBUG: No photo selected")
-                }
+                applyDeleteToggleToSelectedPhotos()
                 return .handled
             default:
                 return .ignored
@@ -551,10 +529,10 @@ struct ThumbGridView: View {
             if labelKey == "6" || labelKey == "7" || labelKey == "8" || labelKey == "9" || labelKey == "0" ||
                 (keyPress.modifiers.contains(.command) && (labelKey == "6" || labelKey == "7" || labelKey == "8" || labelKey == "9" || labelKey == "0")) {
 
-                if let selectedPhoto = filesModel.selectedPhoto, let label = targetLabel {
-                    createAndSaveXmpFile(for: selectedPhoto, targetLabel: label)
+                if let label = targetLabel {
+                    applyLabelToSelectedPhotos(label: label)
                 } else {
-                    print("DEBUG: No photo selected")
+                    print("DEBUG: No target label found")
                 }
                 return .handled
             }
@@ -795,6 +773,66 @@ struct ThumbGridView: View {
             print("   ID preserved: \(photo.id)")
         } else {
             print("⚠️ Photo not found in filesModel: \(photo.path)")
+        }
+    }
+
+    // MARK: - Bulk Action Helper Functions
+
+    private func applyRatingToSelectedPhotos(rating: Int) {
+        let photosToUpdate = getSelectedPhotosForBulkAction()
+        guard !photosToUpdate.isEmpty else { return }
+
+        print("📊 Applying rating \(rating) to \(photosToUpdate.count) selected photos")
+
+        for photo in photosToUpdate {
+            setPhotoRating(photo: photo, rating: rating)
+        }
+    }
+
+    private func applyLabelToSelectedPhotos(label: String) {
+        let photosToUpdate = getSelectedPhotosForBulkAction()
+        guard !photosToUpdate.isEmpty else { return }
+
+        print("🏷️ Applying label '\(label)' to \(photosToUpdate.count) selected photos")
+
+        for photo in photosToUpdate {
+            createAndSaveXmpFile(for: photo, targetLabel: label)
+        }
+    }
+
+    private func applyLabelRemovalToSelectedPhotos() {
+        let photosToUpdate = getSelectedPhotosForBulkAction()
+        guard !photosToUpdate.isEmpty else { return }
+
+        print("🗑️ Removing labels from \(photosToUpdate.count) selected photos")
+
+        for photo in photosToUpdate {
+            removeAnyLabel(for: photo)
+        }
+    }
+
+    private func applyDeleteToggleToSelectedPhotos() {
+        let photosToUpdate = getSelectedPhotosForBulkAction()
+        guard !photosToUpdate.isEmpty else { return }
+
+        print("🗑️ Toggling delete state for \(photosToUpdate.count) selected photos")
+
+        for photo in photosToUpdate {
+            toggleToDeleteState(for: photo)
+        }
+    }
+
+    private func getSelectedPhotosForBulkAction() -> [PhotoItem] {
+        if selectedPhotos.count > 1 {
+            // Multiple photos selected - apply to all selected photos
+            return filteredPhotos.filter { selectedPhotos.contains($0.id) }
+        } else if let selectedPhoto = filesModel.selectedPhoto {
+            // Single photo selected - apply to just that photo
+            return [selectedPhoto]
+        } else {
+            // No photo selected
+            print("DEBUG: No photos selected for bulk action")
+            return []
         }
     }
 
