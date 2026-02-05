@@ -148,22 +148,44 @@ class FileSystemMonitor {
 
         guard isInMonitoredPath else { return false }
 
-        // We're interested in any file system changes in monitored directories
+        // Ignore XMP files - these are metadata files we create and don't need to trigger reloads
+        let fileExtension = URL(fileURLWithPath: pathString).pathExtension.lowercased()
+        if fileExtension == "xmp" {
+            return false
+        }
+
+        // Check if it's a photo file extension
+        let photoExtensions = ["jpg", "jpeg", "png", "heic", "tiff", "tif", "arw", "orf", "rw2",
+                              "cr2", "cr3", "crw", "nef", "nrw", "srf", "sr2", "raw", "raf",
+                              "pef", "ptx", "dng", "3fr", "fff", "iiq", "mef", "mos", "x3f",
+                              "srw", "dcr", "kdc", "k25", "kc2", "mrw", "erf", "bay", "ndd",
+                              "sti", "rwl", "r3d"]
+        let isPhotoFile = photoExtensions.contains(fileExtension)
+
+        // We're only interested in photo files being created or removed (not modified)
         let isFileCreated = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemCreated)) != 0
         let isFileRemoved = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRemoved)) != 0
         let isFileRenamed = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRenamed)) != 0
-        let isFileModified = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemModified)) != 0
 
-        // Any change in a monitored folder is relevant
-        let isRelevant = isFileCreated || isFileRemoved || isFileRenamed || isFileModified
+        // Also handle directory changes (new folders being added)
+        let isDirectoryEvent = (flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsDir)) != 0
+        let isDirectoryChange = isDirectoryEvent && (isFileCreated || isFileRemoved || isFileRenamed)
+
+        // Only trigger reload for:
+        // 1. Photo files being created, removed, or renamed
+        // 2. Directory changes (new folders)
+        let isRelevant = (isPhotoFile && (isFileCreated || isFileRemoved || isFileRenamed)) || isDirectoryChange
 
         if isRelevant {
-            print("📁 File system change detected:")
+            print("📁 Relevant file system change detected (photo or directory):")
             print("   Path: \(pathString)")
+            print("   Is Photo File: \(isPhotoFile)")
+            print("   Is Directory: \(isDirectoryEvent)")
             print("   Created: \(isFileCreated)")
             print("   Removed: \(isFileRemoved)")
             print("   Renamed: \(isFileRenamed)")
-            print("   Modified: \(isFileModified)")
+        } else if fileExtension == "xmp" {
+            print("📄 XMP file change ignored: \(pathString)")
         }
 
         return isRelevant
