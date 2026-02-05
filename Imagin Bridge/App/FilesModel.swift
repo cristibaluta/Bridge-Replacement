@@ -7,6 +7,74 @@
 import Foundation
 import CoreServices
 
+// MARK: - File Monitoring
+
+class FileSystemMonitor {
+    private var monitoredFolders: [URL: DispatchSourceFileSystemObject] = [:]
+    private let queue = DispatchQueue(label: "file.monitor", qos: .utility)
+    weak var delegate: FileSystemMonitorDelegate?
+
+    func startMonitoring(url: URL) {
+        // Don't monitor the same folder twice
+        if monitoredFolders[url] != nil {
+            return
+        }
+
+        let fileDescriptor = open(url.path, O_EVTONLY)
+        guard fileDescriptor >= 0 else {
+            print("Failed to open file descriptor for \(url.path)")
+            return
+        }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fileDescriptor,
+            eventMask: [.write, .rename, .delete],
+            queue: queue
+        )
+
+        source.setEventHandler { [weak self] in
+            let events = source.mask
+            if events.contains(.write) || events.contains(.rename) {
+                Task { @MainActor in
+                    self?.delegate?.folderContentsDidChange(at: url)
+                }
+            }
+        }
+
+        source.setCancelHandler {
+            close(fileDescriptor)
+        }
+
+        source.resume()
+        monitoredFolders[url] = source
+        print("Started monitoring folder: \(url.path)")
+    }
+
+    func stopMonitoring(url: URL) {
+        if let source = monitoredFolders.removeValue(forKey: url) {
+            source.cancel()
+            print("Stopped monitoring folder: \(url.path)")
+        }
+    }
+
+    func stopAllMonitoring() {
+        for (_, source) in monitoredFolders {
+            source.cancel()
+        }
+        monitoredFolders.removeAll()
+        print("Stopped all folder monitoring")
+    }
+
+    deinit {
+        stopAllMonitoring()
+    }
+}
+
+@MainActor
+protocol FileSystemMonitorDelegate: AnyObject {
+    func folderContentsDidChange(at url: URL)
+}
+
 // MARK: - Security-Scoped Bookmark Management
 
 struct FolderBookmark: Codable {
@@ -178,7 +246,7 @@ func loadPhotos(in folder: FolderItem?) -> [PhotoItem] {
 
 
 @MainActor
-final class FilesModel: ObservableObject {
+final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
     @Published var rootFolders: [FolderItem] = []
     @Published var selectedFolder: FolderItem? {
         didSet {
@@ -192,16 +260,72 @@ final class FilesModel: ObservableObject {
 
     private let userFoldersKey = "UserManagedFolderBookmarks"
     private var accessedURLs: Set<URL> = []
+    private let fileMonitor = FileSystemMonitor()
 
     init() {
+        fileMonitor.delegate = self
         loadUserFolders()
     }
 
     deinit {
+        // Stop file monitoring
+        fileMonitor.stopAllMonitoring()
+
         // Stop accessing all security-scoped resources
         for url in accessedURLs {
             url.stopAccessingSecurityScopedResource()
         }
+    }
+
+    // MARK: - FileSystemMonitorDelegate
+
+    func folderContentsDidChange(at url: URL) {
+        print("Folder contents changed at: \(url.path)")
+
+        // Find and refresh the affected folder in our tree
+        refreshFolderTree(for: url)
+
+        // If this is the currently selected folder, refresh the photos
+        if let selectedFolder = selectedFolder, selectedFolder.url == url {
+            loadPhotosForSelectedFolder()
+        }
+    }
+
+    private func refreshFolderTree(for changedURL: URL) {
+        // Find the folder in our root folders and refresh it
+        for i in 0..<rootFolders.count {
+            if let updatedFolder = refreshFolderRecursively(folder: rootFolders[i], changedURL: changedURL) {
+                rootFolders[i] = updatedFolder
+                break
+            }
+        }
+    }
+
+    private func refreshFolderRecursively(folder: FolderItem, changedURL: URL) -> FolderItem? {
+        // Check if this is the folder that changed
+        if folder.url == changedURL {
+            // Refresh this folder's children
+            let refreshedTree = loadFolderTree(at: folder.url, maxDepth: 2, currentDepth: 0, bookmarkData: folder.bookmarkData)
+            return refreshedTree
+        }
+
+        // Check if the changed URL is a child of this folder
+        if changedURL.path.hasPrefix(folder.url.path) {
+            // Recursively refresh children
+            var updatedChildren: [FolderItem]? = nil
+            if let children = folder.children {
+                updatedChildren = children.compactMap { child in
+                    refreshFolderRecursively(folder: child, changedURL: changedURL)
+                }
+                // If no children were updated, keep the original children
+                if updatedChildren?.isEmpty == true {
+                    updatedChildren = children
+                }
+            }
+            return FolderItem(url: folder.url, children: updatedChildren, bookmarkData: folder.bookmarkData)
+        }
+
+        return nil // This folder wasn't affected by the change
     }
 
     func addFolder(at url: URL) {
@@ -230,11 +354,17 @@ final class FilesModel: ObservableObject {
         let newFolder = loadFolderTree(at: url, maxDepth: 2, currentDepth: 0, bookmarkData: bookmarkData)
         rootFolders.append(newFolder)
 
+        // Start monitoring the folder for file system changes
+        fileMonitor.startMonitoring(url: url)
+
         // Save to UserDefaults
         saveUserFolders()
     }
 
     func removeFolder(at url: URL) {
+        // Stop monitoring the folder
+        fileMonitor.stopMonitoring(url: url)
+
         // Stop accessing the security-scoped resource
         if accessedURLs.contains(url) {
             url.stopAccessingSecurityScopedResource()
@@ -259,6 +389,9 @@ final class FilesModel: ObservableObject {
                     if FileManager.default.fileExists(atPath: restoredURL.path) {
                         let folderTree = loadFolderTree(at: restoredURL, maxDepth: 2, currentDepth: 0, bookmarkData: bookmark.bookmarkData)
                         rootFolders.append(folderTree)
+
+                        // Start monitoring the restored folder for changes
+                        fileMonitor.startMonitoring(url: restoredURL)
                     } else {
                         // Folder no longer exists, stop accessing the resource
                         restoredURL.stopAccessingSecurityScopedResource()
