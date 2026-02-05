@@ -13,6 +13,13 @@ struct SidebarView: View {
     @State private var showingFolderPicker = false
     @State private var showingAddPopover = false
     let onDoubleClick: (() -> Void)?
+    let hideBottomBar: Bool
+
+    // Default initializer for backwards compatibility
+    init(onDoubleClick: (() -> Void)? = nil, hideBottomBar: Bool = false) {
+        self.onDoubleClick = onDoubleClick
+        self.hideBottomBar = hideBottomBar
+    }
 
     private let expandedFoldersKey = "ExpandedFolders"
     private let selectedFolderKey = "SelectedFolder"
@@ -84,63 +91,65 @@ struct SidebarView: View {
                 .focusable(false)
             }
 
-            // Bottom bar with add and remove buttons
-            HStack {
-                Button(action: {
-                    showingAddPopover = true
-                }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.primary)
-                        .frame(width: 20, height: 20)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PlainButtonStyle())
-                .frame(width: 24, height: 32)
-                .contentShape(Rectangle())
-                .help("Add folder")
-                .popover(isPresented: $showingAddPopover) {
-                    AddFolderPopover(
-                        onAddVolumes: {
-                            showingAddPopover = false
-                            addVolumesFolder()
-                        },
-                        onAddCustomFolder: {
-                            showingAddPopover = false
-                            showingFolderPicker = true
-                        }
-                    )
-                }
-
-                Button(action: {
-                    if let selectedFolder = filesModel.selectedFolder {
-                        // Only remove if the selected folder is a root folder
-                        if isRootFolder(selectedFolder.url) {
-                            filesModel.removeFolder(at: selectedFolder.url)
-                        }
+            // Bottom bar with add and remove buttons - only show if not hidden
+            if !hideBottomBar {
+                HStack {
+                    Button(action: {
+                        showingAddPopover = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.primary)
+                            .frame(width: 20, height: 20)
+                            .contentShape(Rectangle())
                     }
-                }) {
-                    Image(systemName: "minus")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(isRootFolderSelected() ? .primary : .secondary)
-                        .frame(width: 20, height: 20)
-                        .contentShape(Rectangle())
+                    .buttonStyle(PlainButtonStyle())
+                    .frame(width: 24, height: 32)
+                    .contentShape(Rectangle())
+                    .help("Add folder")
+                    .popover(isPresented: $showingAddPopover) {
+                        AddFolderPopover(
+                            onAddVolumes: {
+                                showingAddPopover = false
+                                addVolumesFolder()
+                            },
+                            onAddCustomFolder: {
+                                showingAddPopover = false
+                                showingFolderPicker = true
+                            }
+                        )
+                    }
+
+                    Button(action: {
+                        if let selectedFolder = filesModel.selectedFolder {
+                            // Only remove if the selected folder is a root folder
+                            if isRootFolder(selectedFolder.url) {
+                                filesModel.removeFolder(at: selectedFolder.url)
+                            }
+                        }
+                    }) {
+                        Image(systemName: "minus")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(isRootFolderSelected() ? .primary : .secondary)
+                            .frame(width: 20, height: 20)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .frame(width: 24, height: 32)
+                    .contentShape(Rectangle())
+                    .disabled(!isRootFolderSelected())
+                    .help("Remove folder")
+
+                    Spacer()
+
+                    Text("\(filesModel.rootFolders.count) folders")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .frame(width: 24, height: 32)
-                .contentShape(Rectangle())
-                .disabled(!isRootFolderSelected())
-                .help("Remove folder")
-
-                Spacer()
-
-                Text("\(filesModel.rootFolders.count) folders")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(Color(NSColor.controlBackgroundColor))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .background(Color(NSColor.controlBackgroundColor))
         }
         .onAppear {
             loadExpandedState()
