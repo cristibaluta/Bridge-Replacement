@@ -12,31 +12,7 @@ struct FolderSelectionPopoverView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                Text("Select Folder")
-                    .font(.headline)
-                    .padding(.leading, 16)
-                    .padding(.top, 12)
-
-                Spacer()
-
-                Button("Done") {
-                    dismiss()
-                }
-                .padding(.trailing, 16)
-                .padding(.top, 12)
-            }
-
-            Divider()
-                .padding(.top, 8)
-
-            // Reuse the existing SidebarView
-            SidebarView(onDoubleClick: nil)
-                .padding(.top, 8)
-        }
-        .frame(width: 300, height: 400)
-        .background(Color(NSColor.controlBackgroundColor))
+        SidebarView(onDoubleClick: nil)
+            .environmentObject(filesModel)
     }
 }

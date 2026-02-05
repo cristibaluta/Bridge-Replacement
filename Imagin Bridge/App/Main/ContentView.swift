@@ -180,7 +180,8 @@ struct ContentView: View {
                 // Double-click callback: collapse sidebar to double column view
                 columnVisibilityStorage = "doubleColumn"
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
+            .navigationSplitViewColumnWidth(min: 150, ideal: 200, max: 250)
+            .environmentObject(filesModel)
         } content: {
             // Middle: thumbnails
             ThumbGridView(
@@ -257,6 +258,7 @@ struct ContentView: View {
             .popover(isPresented: $showFolderPopover) {
                 FolderSelectionPopoverView()
                     .frame(width: 300, height: 500)
+                    .environmentObject(filesModel)
             }
         }
     }
