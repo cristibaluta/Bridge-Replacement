@@ -75,26 +75,12 @@ struct FolderRowView: View {
                     )
                 }
             } label: {
-                Label(folder.url.lastPathComponent, systemImage: "folder.fill")
-                    .tint(folderColor)
-                    .tag(folder)
-                    .onTapGesture {
-                        selectedFolder = folder
-                    }
-                    .onDoubleClick {
-                        onDoubleClick()
-                    }
-                    .contextMenu {
-                        Button(action: {
-                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folder.url.path)
-                        }) {
-                            Label("Reveal in Finder", systemImage: "magnifyingglass")
-                        }
-                    }
-            }
-        } else {
-            Label(folder.url.lastPathComponent, systemImage: "folder.fill")
-                .tint(folderColor)
+                Label {
+                    Text(folder.url.lastPathComponent)
+                } icon: {
+                    Image(systemName: "folder.fill")
+                        .foregroundStyle(folderColor)
+                }
                 .tag(folder)
                 .onTapGesture {
                     selectedFolder = folder
@@ -109,6 +95,28 @@ struct FolderRowView: View {
                         Label("Reveal in Finder", systemImage: "magnifyingglass")
                     }
                 }
+            }
+        } else {
+            Label {
+                Text(folder.url.lastPathComponent)
+            } icon: {
+                Image(systemName: "folder.fill")
+                    .foregroundStyle(folderColor)
+            }
+            .tag(folder)
+            .onTapGesture {
+                selectedFolder = folder
+            }
+            .onDoubleClick {
+                onDoubleClick()
+            }
+            .contextMenu {
+                Button(action: {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folder.url.path)
+                }) {
+                    Label("Reveal in Finder", systemImage: "magnifyingglass")
+                }
+            }
         }
     }
 }
