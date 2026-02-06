@@ -252,8 +252,8 @@ struct ContentView: View {
             openSelectedPhotosCallback?()
         }) {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.up.forward.app")
-                    .font(.system(size: 12, weight: .medium))
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.system(size: 10, weight: .regular))
                 Text(selectedApp?.displayName ?? "Default App")
             }
             .foregroundColor(filesModel.selectedPhoto != nil ? .primary : .secondary)
@@ -322,10 +322,6 @@ struct ContentView: View {
 
     private func sharePhoto(_ photo: PhotoItem) {
         let url = URL(fileURLWithPath: photo.path)
-
-        // Use NSSharingService to show the native macOS sharing popover
-        let sharingService = NSSharingService(named: NSSharingService.Name.composeEmail)
-        let sharingServices = NSSharingService.sharingServices(forItems: [url])
 
         // Create a sharing service picker to show all available sharing options
         let sharingServicePicker = NSSharingServicePicker(items: [url])
