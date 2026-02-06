@@ -45,7 +45,10 @@ struct ThumbCell: View {
             .frame(width: size, height: size)
             .overlay(
                 Rectangle()
-                    .stroke(isSelected ? Color.blue : .clear, lineWidth: 2)
+                    .stroke(
+                        isSelected ? Color.blue : .clear,
+                        lineWidth: 2
+                    )
             )
             .overlay(
                 // Trash icon overlay for photos marked for deletion
@@ -127,6 +130,7 @@ struct ThumbCell: View {
                         starSize: 10, // Slightly smaller stars
                         onRatingChanged: onRatingChanged
                     )
+                    .allowsHitTesting(true) // Ensure stars can receive clicks
                 } else {
                     // Invisible spacer to maintain consistent height
                     Spacer()
@@ -137,6 +141,7 @@ struct ThumbCell: View {
 
             Spacer()
         }
+        .contentShape(Rectangle()) // Make entire cell area hoverable
         .onHover { hovering in
             isHovering = hovering
         }

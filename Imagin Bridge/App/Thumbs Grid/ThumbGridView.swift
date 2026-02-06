@@ -135,7 +135,7 @@ struct ThumbGridView: View {
     private func createThumbCell(for photo: PhotoItem) -> some View {
         ThumbCell(
             photo: photo,
-            isSelected: filesModel.selectedPhoto?.id == photo.id || (viewModel.selectedPhotos.count > 1 && viewModel.selectedPhotos.contains(photo.id)),
+            isSelected: viewModel.selectedPhotos.contains(photo.id),
             onTap: { modifiers in
                 viewModel.handlePhotoTap(photo: photo, modifiers: modifiers)
             },
