@@ -252,7 +252,22 @@ struct SidebarView: View {
     }
 
     private func addVolumesFolder() {
-        let volumesURL = URL(fileURLWithPath: "/Volumes")
-        filesModel.addFolder(at: volumesURL)
+        // Instead of adding /Volumes directly (which won't work in sandboxed apps),
+        // open a file picker at /Volumes to let user select which volume to add
+        let openPanel = NSOpenPanel()
+        openPanel.message = "Select a volume or folder in /Volumes to access"
+        openPanel.prompt = "Add Folder"
+        openPanel.canChooseFiles = false
+        openPanel.canChooseDirectories = true
+        openPanel.canCreateDirectories = false
+        openPanel.allowsMultipleSelection = false
+        openPanel.directoryURL = URL(fileURLWithPath: "/Volumes")
+
+        openPanel.begin { response in
+            if response == .OK, let selectedURL = openPanel.url {
+                // User selected a folder in /Volumes - add it
+                self.filesModel.addFolder(at: selectedURL)
+            }
+        }
     }
 }

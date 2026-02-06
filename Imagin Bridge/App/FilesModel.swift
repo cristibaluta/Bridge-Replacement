@@ -6,6 +6,7 @@
 //
 import Foundation
 import CoreServices
+import AppKit
 
 // MARK: - File Monitoring
 
@@ -521,21 +522,35 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
     func addFolder(at url: URL) {
         // Check if folder already exists
         if rootFolders.contains(where: { $0.url == url }) {
+            print("⚠️ Folder already added: \(url.path)")
             return
         }
 
-        // Start accessing the security-scoped resource first (this is crucial for fileImporter URLs)
+        // Start accessing the security-scoped resource
+        // fileImporter and NSOpenPanel already handle permission dialogs,
+        // so we trust the URL they give us
         guard url.startAccessingSecurityScopedResource() else {
-            print("Failed to start accessing security-scoped resource: \(url)")
+            print("❌ Failed to start accessing security-scoped resource: \(url.path)")
             return
         }
 
-        // Create security-scoped bookmark for the selected folder
-        guard let bookmarkData = createSecurityScopedBookmark(for: url) else {
-            print("Failed to create bookmark for folder: \(url)")
-            // Stop accessing if bookmark creation fails
+        // Verify we can read the folder
+        guard FileManager.default.isReadableFile(atPath: url.path) else {
+            print("❌ Cannot read folder: \(url.path)")
             url.stopAccessingSecurityScopedResource()
             return
+        }
+
+        // Create security-scoped bookmark for persistence
+        guard let bookmarkData = createSecurityScopedBookmark(for: url) else {
+            print("❌ Failed to create bookmark for: \(url.path)")
+            url.stopAccessingSecurityScopedResource()
+            return
+        }
+
+        print("✅ Successfully added folder: \(url.path)")
+        if url.path.hasPrefix("/Volumes/") {
+            print("   (Volume/Network path - bookmark saved)")
         }
 
         accessedURLs.insert(url)
@@ -544,7 +559,7 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
         let newFolder = loadFolderTree(at: url, maxDepth: 2, currentDepth: 0, bookmarkData: bookmarkData)
         rootFolders.append(newFolder)
 
-        // Start monitoring the folder for file system changes
+        // Start monitoring for file system changes
         fileMonitor.startMonitoring(url: url)
 
         // Save to UserDefaults
