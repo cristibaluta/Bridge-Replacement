@@ -30,7 +30,7 @@ struct LargePreviewView: View {
                             Image(nsImage: nsImage)
                                 .resizable()
                                 .scaledToFit()
-                                .padding()
+                                .padding(2)
                             Spacer()
                         }
                         Spacer()
@@ -39,7 +39,7 @@ struct LargePreviewView: View {
                     Image(nsImage: nsImage)
                         .resizable()
                         .scaledToFit()
-                        .padding()
+                        .padding(2)
                 }
             } else if isLoading {
                 ProgressView("Loading...")
