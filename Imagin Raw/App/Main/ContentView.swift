@@ -252,8 +252,8 @@ struct ContentView: View {
             openSelectedPhotosCallback?()
         }) {
             HStack(spacing: 6) {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .font(.system(size: 10, weight: .regular))
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 12, weight: .regular))
                 Text(selectedApp?.displayName ?? "Default App")
             }
             .foregroundColor(filesModel.selectedPhoto != nil ? .primary : .secondary)
