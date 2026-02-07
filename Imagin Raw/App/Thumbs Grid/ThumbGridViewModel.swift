@@ -184,10 +184,6 @@ class ThumbGridViewModel: ObservableObject {
     }
 
     // MARK: - Caching Progress
-    var totalPhotosCount: Int {
-        return photos.count
-    }
-
     var showCachingProgress: Bool {
         return cachingQueueCount > 0
     }

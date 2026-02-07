@@ -256,7 +256,7 @@ struct ThumbGridView: View {
         Group {
             // Priority 1: Show caching progress when generating thumbnails
             if viewModel.showCachingProgress {
-                Text("Caching \(viewModel.cachingQueueCount) of \(viewModel.totalPhotosCount)")
+                Text("Generating \(viewModel.cachingQueueCount) thumbnails...")
                     .font(.caption)
                     .foregroundColor(.orange)
             }
