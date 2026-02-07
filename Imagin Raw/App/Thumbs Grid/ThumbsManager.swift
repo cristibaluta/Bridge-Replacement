@@ -194,6 +194,41 @@ class ThumbsManager: ObservableObject {
         }
     }
 
+    /// Delete cached thumbnail for a specific photo (both memory and disk)
+    func deleteCachedThumbnail(for path: String) {
+        let key = cacheKey(for: path)
+        let subdirectory = cacheSubdirectory(for: path)
+        let diskCachePath = subdirectory.appendingPathComponent("\(key).jpg")
+
+        print("🗑️ Deleting thumbnail cache for: \(key)")
+        print("   - Cache path: \(diskCachePath.path)")
+
+        // Remove from memory cache
+        cacheQueue.async(flags: .barrier) { [weak self] in
+            guard let self = self else { return }
+            self.memoryCache.removeValue(forKey: key)
+            self.cacheAccessOrder.removeAll { $0 == key }
+            print("   ✓ Removed from memory cache")
+        }
+
+        // Remove from disk cache
+        diskQueue.async {
+            let fileExists = FileManager.default.fileExists(atPath: diskCachePath.path)
+            print("   - File exists on disk: \(fileExists)")
+
+            if fileExists {
+                do {
+                    try FileManager.default.removeItem(at: diskCachePath)
+                    print("   ✓ Removed from disk cache")
+                } catch {
+                    print("   ❌ Failed to remove from disk: \(error)")
+                }
+            } else {
+                print("   ⚠️ File not found on disk")
+            }
+        }
+    }
+
     /// Stop all pending thumbnail requests and clear the queue
     /// Useful when switching folders to prevent processing thumbnails for old folder
     func stopQueue() {

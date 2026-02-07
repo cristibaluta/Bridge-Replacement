@@ -112,12 +112,22 @@ struct ThumbGridView: View {
                 isFocused = true
                 viewModel.initializeSelection()
             }
-            .onChange(of: viewModel.photos) { _, newPhotos in
+            .onChange(of: filesModel.photos) { oldPhotos, newPhotos in
+                print("📸 onChange(filesModel.photos) triggered - old: \(oldPhotos.count), new: \(newPhotos.count)")
+
+                // Clear invalid filters when photos change (e.g., folder switch)
+                viewModel.clearInvalidFilters()
+
                 if filesModel.selectedPhoto == nil && !newPhotos.isEmpty {
                     filesModel.selectedPhoto = newPhotos.first
                 }
             }
-            .onChange(of: filesModel.selectedFolder) { _, newFolder in
+            .onChange(of: filesModel.selectedFolder) {
+                print("📁 onChange(selectedFolder) triggered")
+
+                // Clear invalid filters before selecting photos
+                viewModel.clearInvalidFilters()
+
                 // Scroll to top and select first photo when folder changes
                 if let firstPhoto = viewModel.filteredPhotos.first {
                     // Select the first photo
@@ -144,6 +154,10 @@ struct ThumbGridView: View {
             },
             onRatingChanged: { rating in
                 viewModel.applyRating(rating, to: [photo])
+            },
+            onMoveToTrash: {
+                let photosToTrash = viewModel.getSelectedPhotosForBulkAction()
+                viewModel.movePhotosToTrash(photosToTrash)
             },
             size: viewModel.gridType.thumbSize
         )
