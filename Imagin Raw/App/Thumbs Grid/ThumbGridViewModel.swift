@@ -537,7 +537,8 @@ class ThumbGridViewModel: ObservableObject {
         // Update MetadataDate
         let currentDate = Date()
         let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone, .withColonSeparatorInTimeZone]
+        dateFormatter.timeZone = TimeZone.current
         let currentDateString = dateFormatter.string(from: currentDate)
 
         let metadataDatePattern = #"xmp:MetadataDate="[^"]*""#

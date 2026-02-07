@@ -203,7 +203,6 @@ class XmpParser {
 
     /// Update or add an XMP attribute using XML parsing with regex fallback
     private static func updateXmpAttributeXML(in xmpContent: String, attribute: String, value: String) -> String {
-
         // First try XML parsing
         do {
             let xmlDoc = try XMLDocument(xmlString: xmpContent, options: [.documentTidyXML])
@@ -218,7 +217,6 @@ class XmpParser {
             guard let descriptionElement = nodes.first as? XMLElement else {
                 return updateXmpAttributeRegex(in: xmpContent, attribute: attribute, value: value)
             }
-
 
             // Remove existing attribute if present
             if let existingAttr = descriptionElement.attribute(forName: attribute) {
@@ -242,7 +240,6 @@ class XmpParser {
 
     /// Remove an XMP attribute using XML parsing with regex fallback
     private static func removeXmpAttributeXML(from xmpContent: String, attribute: String) -> String {
-
         // First try XML parsing
         do {
             let xmlDoc = try XMLDocument(xmlString: xmpContent, options: [.documentTidyXML])
@@ -261,7 +258,6 @@ class XmpParser {
             // Remove the attribute if it exists
             if descriptionElement.attribute(forName: attribute) != nil {
                 descriptionElement.removeAttribute(forName: attribute)
-            } else {
             }
 
             // Update MetadataDate
@@ -279,7 +275,8 @@ class XmpParser {
     private static func updateMetadataDate(in element: XMLElement) {
         let currentDate = Date()
         let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone, .withColonSeparatorInTimeZone]
+        dateFormatter.timeZone = TimeZone.current
         let currentDateString = dateFormatter.string(from: currentDate)
 
         if let metadataAttr = element.attribute(forName: "xmp:MetadataDate") {
@@ -342,7 +339,8 @@ class XmpParser {
     private static func updateMetadataDateRegex(in content: inout String) {
         let currentDate = Date()
         let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone, .withColonSeparatorInTimeZone]
+        dateFormatter.timeZone = TimeZone.current
         let currentDateString = dateFormatter.string(from: currentDate)
 
         let pattern = "xmp:MetadataDate\\s*=\\s*\"[^\"]*\""
@@ -467,7 +465,8 @@ class XmpParser {
         // Update xmp:MetadataDate with current date
         let currentDate = Date()
         let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone]
+        dateFormatter.formatOptions = [.withInternetDateTime, .withTimeZone, .withColonSeparatorInTimeZone]
+        dateFormatter.timeZone = TimeZone.current
         let currentDateString = dateFormatter.string(from: currentDate)
         content = updateXmpAttributeXML(in: content, attribute: "xmp:MetadataDate", value: currentDateString)
 
