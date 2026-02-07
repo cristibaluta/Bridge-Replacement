@@ -155,8 +155,17 @@ struct ThumbGridView: View {
             onRatingChanged: { rating in
                 viewModel.applyRating(rating, to: [photo])
             },
-            onMoveToTrash: {
-                let photosToTrash = viewModel.getSelectedPhotosForBulkAction()
+            onMoveToTrash: { rightClickedPhoto in
+                // If the right-clicked photo is not in the selection, only delete it
+                // Otherwise, delete all selected photos
+                let photosToTrash: [PhotoItem]
+                if viewModel.selectedPhotos.contains(rightClickedPhoto.id) {
+                    // Right-clicked photo is part of selection - delete all selected
+                    photosToTrash = viewModel.getSelectedPhotosForBulkAction()
+                } else {
+                    // Right-clicked photo is not selected - delete only this one
+                    photosToTrash = [rightClickedPhoto]
+                }
                 viewModel.movePhotosToTrash(photosToTrash)
             },
             size: viewModel.gridType.thumbSize

@@ -12,7 +12,7 @@ struct ThumbCell: View {
     let onTap: (NSEvent.ModifierFlags) -> Void
     let onDoubleClick: () -> Void
     let onRatingChanged: (Int) -> Void
-    let onMoveToTrash: () -> Void
+    let onMoveToTrash: (PhotoItem) -> Void
     let size: CGFloat  // Now accepts size as a parameter
     @State private var thumbnailImage: NSImage?
     @State private var isLoading = false
@@ -156,7 +156,7 @@ struct ThumbCell: View {
             Divider()
 
             Button(action: {
-                onMoveToTrash()
+                onMoveToTrash(photo)
             }) {
                 Label("Move to Trash", systemImage: "trash")
             }
