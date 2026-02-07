@@ -96,7 +96,7 @@ struct ThumbGridView: View {
                     createThumbCell(for: photo)
                 }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 12)
             .padding(.vertical, 4)
         }
 
