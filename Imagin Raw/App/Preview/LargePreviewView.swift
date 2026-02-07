@@ -126,35 +126,27 @@ struct LargePreviewView: View {
 
         if rawExtensions.contains(fileExtension) {
             // Load RAW file using new RawPhoto method
-            print("Loading RAW preview for: \(path)")
             guard let rawPhoto = RawWrapper.shared().extractRawPhoto(path) else {
-                print("Failed to extract RawPhoto from: \(path)")
                 return (nil, nil)
             }
 
             // Store EXIF data for display
             var exifInfo: [String: Any]? = nil
             if let exifData = rawPhoto.exifData {
-                print("=== EXIF Data for \(url.lastPathComponent) ===")
                 for (key, value) in exifData {
-                    print("\(key): \(value)")
                 }
-                print("=== End EXIF Data ===")
                 exifInfo = exifData as? [String: Any]
             } else {
-                print("No EXIF data found for: \(path)")
             }
 
             // Return the image and EXIF data
             guard let imageData = rawPhoto.imageData else {
-                print("No image data in RawPhoto for: \(path)")
                 return (nil, exifInfo)
             }
 
             return (NSImage(data: imageData), exifInfo)
         } else {
             // Load regular image file directly from disk
-            print("Loading image preview for: \(url)")
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                   let existingMetadata: CGImageMetadata = CGImageSourceCopyMetadataAtIndex(source, 0, nil) else {
                 return (NSImage(contentsOfFile: path), nil)

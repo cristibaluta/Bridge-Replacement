@@ -78,13 +78,11 @@ class FileSystemMonitor {
         // Create new stream with all paths
         startFSEventStream()
 
-        print("Started monitoring folder tree: \(url.path)")
     }
 
     func stopMonitoring(url: URL) {
         if let index = monitoredPaths.firstIndex(of: url.path) {
             monitoredPaths.remove(at: index)
-            print("Stopped monitoring folder: \(url.path)")
 
             // Restart stream with remaining paths
             stopAllMonitoring()
@@ -176,15 +174,7 @@ class FileSystemMonitor {
         let isRelevant = (isPhotoFile && (isFileCreated || isFileRemoved || isFileRenamed)) || isDirectoryChange
 
         if isRelevant {
-            print("📁 Relevant file system change detected (photo or directory):")
-            print("   Path: \(pathString)")
-            print("   Is Photo File: \(isPhotoFile)")
-            print("   Is Directory: \(isDirectoryEvent)")
-            print("   Created: \(isFileCreated)")
-            print("   Removed: \(isFileRemoved)")
-            print("   Renamed: \(isFileRenamed)")
         } else if fileExtension == "xmp" {
-            print("📄 XMP file change ignored: \(pathString)")
         }
 
         return isRelevant
@@ -222,7 +212,6 @@ func createSecurityScopedBookmark(for url: URL) -> Data? {
         )
         return bookmarkData
     } catch {
-        print("Failed to create bookmark for \(url): \(error)")
         return nil
     }
 }
@@ -238,25 +227,21 @@ func restoreSecurityScopedAccess(from bookmarkData: Data) -> URL? {
         )
 
         if isStale {
-            print("Bookmark data is stale for URL: \(url)")
             // TODO: Handle stale bookmarks by re-requesting access
         }
 
         // Start accessing the security-scoped resource
         guard url.startAccessingSecurityScopedResource() else {
-            print("Failed to start accessing security-scoped resource: \(url)")
             return nil
         }
 
         return url
     } catch {
-        print("Failed to resolve bookmark: \(error)")
         return nil
     }
 }
 
 func loadFolderTree(at url: URL, maxDepth: Int = 2, currentDepth: Int = 0, bookmarkData: Data? = nil) -> FolderItem {
-    print("Load folder tree: \(url.path) currentDepth: \(currentDepth)")
     var children: [FolderItem] = []
 
     let keys: Set<URLResourceKey> = [.isDirectoryKey, .isHiddenKey]
@@ -437,7 +422,6 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
     // MARK: - FileSystemMonitorDelegate
 
     func folderContentsDidChange(at url: URL) {
-        print("Folder contents changed at: \(url.path)")
 
         // Find and refresh the affected folder in our tree
         refreshFolderTree(for: url)
@@ -445,7 +429,6 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
         // If this is the currently selected folder or a parent of it, refresh the photos and thumbnails
         if let selectedFolder = selectedFolder {
             if selectedFolder.url == url || url.path.hasPrefix(selectedFolder.url.path) {
-                print("Refreshing photos and thumbnails for selected folder")
 
                 // Stop any pending thumbnail requests
                 ThumbsManager.shared.stopQueue()
@@ -460,7 +443,6 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
     }
 
     private func refreshFolderTree(for changedURL: URL) {
-        print("Refreshing folder tree for changed URL: \(changedURL.path)")
 
         // Find the closest monitored parent folder that contains this changed path
         var refreshURL = changedURL
@@ -479,7 +461,6 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
         if foundMonitoredParent {
             for i in 0..<rootFolders.count {
                 if rootFolders[i].url.path == refreshURL.path {
-                    print("Refreshing root folder: \(refreshURL.path)")
                     let refreshedTree = loadFolderTree(
                         at: rootFolders[i].url,
                         maxDepth: 2,
@@ -494,7 +475,6 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
             // If no monitored parent found, try to refresh any root folder that might contain this path
             for i in 0..<rootFolders.count {
                 if changedURL.path.hasPrefix(rootFolders[i].url.path) {
-                    print("Refreshing containing root folder: \(rootFolders[i].url.path)")
                     let refreshedTree = loadFolderTree(
                         at: rootFolders[i].url,
                         maxDepth: 2,
@@ -538,7 +518,6 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
     func addFolder(at url: URL) {
         // Check if folder already exists
         if rootFolders.contains(where: { $0.url == url }) {
-            print("⚠️ Folder already added: \(url.path)")
             return
         }
 
@@ -546,27 +525,22 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
         // fileImporter and NSOpenPanel already handle permission dialogs,
         // so we trust the URL they give us
         guard url.startAccessingSecurityScopedResource() else {
-            print("❌ Failed to start accessing security-scoped resource: \(url.path)")
             return
         }
 
         // Verify we can read the folder
         guard FileManager.default.isReadableFile(atPath: url.path) else {
-            print("❌ Cannot read folder: \(url.path)")
             url.stopAccessingSecurityScopedResource()
             return
         }
 
         // Create security-scoped bookmark for persistence
         guard let bookmarkData = createSecurityScopedBookmark(for: url) else {
-            print("❌ Failed to create bookmark for: \(url.path)")
             url.stopAccessingSecurityScopedResource()
             return
         }
 
-        print("✅ Successfully added folder: \(url.path)")
         if url.path.hasPrefix("/Volumes/") {
-            print("   (Volume/Network path - bookmark saved)")
         }
 
         accessedURLs.insert(url)
@@ -619,7 +593,6 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
                         accessedURLs.remove(restoredURL)
                     }
                 } else {
-                    print("Failed to restore access for bookmark: \(bookmark.url)")
                 }
             }
         }

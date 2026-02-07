@@ -64,7 +64,6 @@ struct FolderRowView: View {
 
     private func ejectVolume() {
         guard let volumePath = volumePath else {
-            print("❌ Could not determine volume path for: \(folder.url.path)")
             return
         }
 
@@ -73,9 +72,7 @@ struct FolderRowView: View {
         // Try to unmount the volume
         do {
             try NSWorkspace.shared.unmountAndEjectDevice(at: volumeURL)
-            print("✅ Successfully ejected volume: \(volumePath)")
         } catch {
-            print("❌ Failed to eject volume: \(error.localizedDescription)")
             // Show alert to user
             DispatchQueue.main.async {
                 let alert = NSAlert()
@@ -98,7 +95,6 @@ struct FolderRowView: View {
                             expandedFolders.insert(folder.url)
                             // Trigger on-demand loading if this folder needs its children loaded
                             if needsToLoadChildren {
-                                print("Loading children on demand for: \(folder.url.path)")
                                 filesModel.loadChildrenOnDemand(for: folder)
                             }
                         } else {

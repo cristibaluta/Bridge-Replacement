@@ -149,9 +149,6 @@ struct ContentView: View {
         let breadcrumb = pathComponents.joined(separator: " › ")
 
         // Debug output
-        print("Navigation URL: \(url.path)")
-        print("Path components: \(pathComponents)")
-        print("Breadcrumb: \(breadcrumb)")
 
         return breadcrumb.isEmpty ? url.lastPathComponent : breadcrumb
     }
@@ -344,17 +341,13 @@ struct ContentView: View {
             // Use the selected PhotoApp
             do {
                 try NSWorkspace.shared.open([url], withApplicationAt: app.url, options: [], configuration: [:])
-                print("Opening \(url.lastPathComponent) with \(app.displayName)")
             } catch {
-                print("Failed to open \(url.lastPathComponent) with \(app.displayName): \(error)")
                 // Fallback to default application
                 NSWorkspace.shared.open(url)
-                print("Opening \(url.lastPathComponent) in default app (fallback)")
             }
         } else {
             // Use system default application
             NSWorkspace.shared.open(url)
-            print("Opening \(url.lastPathComponent) in default app")
         }
     }
 
@@ -364,9 +357,7 @@ struct ContentView: View {
 
         do {
             try workspace.open([url], withApplicationAt: app.url, options: [], configuration: [:])
-            print("Opening \(url.lastPathComponent) with \(app.displayName)")
         } catch {
-            print("Failed to open \(url.lastPathComponent) with \(app.displayName): \(error)")
             // Fallback to default application
             NSWorkspace.shared.open(url)
         }
@@ -377,7 +368,6 @@ struct ContentView: View {
 
         // Try to find the application bundle
         guard let appURL = workspace.urlForApplication(withBundleIdentifier: app.bundleID) else {
-            print("App \(app.displayName) not found (Bundle ID: \(app.bundleID))")
             return false
         }
 
@@ -385,7 +375,6 @@ struct ContentView: View {
             try workspace.open([url], withApplicationAt: appURL, options: [], configuration: [:])
             return true
         } catch {
-            print("Failed to open \(url.lastPathComponent) with \(app.displayName): \(error)")
             return false
         }
     }
@@ -426,9 +415,7 @@ struct ContentView: View {
             // Update selectedPhoto to point to the new updated photo instance (same photo, just updated)
             filesModel.selectedPhoto = updatedPhoto
 
-            print("🔄 PhotoItem updated in filesModel with XMP metadata")
         } else {
-            print("⚠️ Photo not found in filesModel: \(photo.path)")
         }
     }
 
@@ -453,9 +440,7 @@ struct ContentView: View {
             filesModel.selectedPhoto = updatedPhoto
 
             let action = updatedPhoto.toDelete ? "Marked" : "Unmarked"
-            print("🗑️ \(action) photo for deletion: \(photo.path)")
         } else {
-            print("⚠️ Photo not found in filesModel: \(photo.path)")
         }
     }
 

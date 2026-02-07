@@ -91,7 +91,7 @@ struct SplashScreenView: View {
                     filesModel.addFolder(at: url)
                 }
             case .failure(let error):
-                print("Failed to select folder: \(error)")
+                break
             }
         }
     }

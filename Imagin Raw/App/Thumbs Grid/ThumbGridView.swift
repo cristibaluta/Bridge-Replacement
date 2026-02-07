@@ -113,8 +113,6 @@ struct ThumbGridView: View {
                 viewModel.initializeSelection()
             }
             .onChange(of: filesModel.photos) { oldPhotos, newPhotos in
-                print("📸 onChange(filesModel.photos) triggered - old: \(oldPhotos.count), new: \(newPhotos.count)")
-
                 // Clear invalid filters when photos change (e.g., folder switch)
                 viewModel.clearInvalidFilters()
 
@@ -123,8 +121,6 @@ struct ThumbGridView: View {
                 }
             }
             .onChange(of: filesModel.selectedFolder) {
-                print("📁 onChange(selectedFolder) triggered")
-
                 // Clear invalid filters before selecting photos
                 viewModel.clearInvalidFilters()
 

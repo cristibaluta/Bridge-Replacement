@@ -236,39 +236,30 @@ class ThumbGridViewModel: ObservableObject {
 
     // MARK: - Rating & Label Management
     func applyRating(_ rating: Int, to photos: [PhotoItem]) {
-        print("📊 Applying rating \(rating) to \(photos.count) selected photos")
         for photo in photos {
             setPhotoRating(photo: photo, rating: rating)
         }
     }
 
     func applyLabel(_ label: String, to photos: [PhotoItem]) {
-        print("🏷️ Applying label '\(label)' to \(photos.count) selected photos")
         for photo in photos {
             createAndSaveXmpFile(for: photo, targetLabel: label)
         }
     }
 
     func removeLabels(from photos: [PhotoItem]) {
-        print("🗑️ Removing labels from \(photos.count) selected photos")
         for photo in photos {
             removeAnyLabel(for: photo)
         }
     }
 
     func toggleDeleteState(for photos: [PhotoItem]) {
-        print("🗑️ Toggling delete state for \(photos.count) selected photos")
         for photo in photos {
             toggleToDeleteState(for: photo)
         }
     }
 
     func movePhotosToTrash(_ photos: [PhotoItem]) {
-        print("🗑️ Moving \(photos.count) photos to trash")
-
-        var movedCount = 0
-        var failedCount = 0
-
         let rawExtensions = ["arw", "orf", "rw2", "cr2", "cr3", "crw", "nef", "nrw",
                            "srf", "sr2", "raw", "raf", "pef", "ptx", "dng", "3fr",
                            "fff", "iiq", "mef", "mos", "x3f", "srw", "dcr", "kdc",
@@ -276,72 +267,46 @@ class ThumbGridViewModel: ObservableObject {
 
         for photo in photos {
             let url = URL(fileURLWithPath: photo.path)
-            let filename = url.lastPathComponent
             let fileExtension = url.pathExtension.lowercased()
             let baseName = url.deletingPathExtension().lastPathComponent
             let directory = url.deletingLastPathComponent()
 
-            print("  → Processing: \(filename)")
-
             do {
                 // Move main file to trash
                 try FileManager.default.trashItem(at: url, resultingItemURL: nil)
-                print("    ✓ Moved file to trash")
 
                 // Delete the cached thumbnail
                 ThumbsManager.shared.deleteCachedThumbnail(for: photo.path)
-                print("    ✓ Deleted cached thumbnail")
 
                 // If this is a RAW file, also delete associated files
                 if rawExtensions.contains(fileExtension) {
-                    print("    → Checking for associated files...")
-
                     // Delete associated JPG files
                     for jpgExt in ["jpg", "jpeg", "JPG", "JPEG"] {
                         let jpgURL = directory.appendingPathComponent("\(baseName).\(jpgExt)")
                         if FileManager.default.fileExists(atPath: jpgURL.path) {
-                            do {
-                                try FileManager.default.trashItem(at: jpgURL, resultingItemURL: nil)
-                                print("    ✓ Deleted associated JPG: \(jpgURL.lastPathComponent)")
-                            } catch {
-                                print("    ⚠️ Failed to delete JPG: \(error)")
-                            }
+                            try? FileManager.default.trashItem(at: jpgURL, resultingItemURL: nil)
                         }
                     }
 
                     // Delete associated XMP file
                     let xmpURL = directory.appendingPathComponent("\(baseName).xmp")
                     if FileManager.default.fileExists(atPath: xmpURL.path) {
-                        do {
-                            try FileManager.default.trashItem(at: xmpURL, resultingItemURL: nil)
-                            print("    ✓ Deleted associated XMP: \(xmpURL.lastPathComponent)")
-                        } catch {
-                            print("    ⚠️ Failed to delete XMP: \(error)")
-                        }
+                        try? FileManager.default.trashItem(at: xmpURL, resultingItemURL: nil)
                     }
 
                     // Delete associated ACR file
                     let acrURL = directory.appendingPathComponent("\(baseName).acr")
                     if FileManager.default.fileExists(atPath: acrURL.path) {
-                        do {
-                            try FileManager.default.trashItem(at: acrURL, resultingItemURL: nil)
-                            print("    ✓ Deleted associated ACR: \(acrURL.lastPathComponent)")
-                        } catch {
-                            print("    ⚠️ Failed to delete ACR: \(error)")
-                        }
+                        try? FileManager.default.trashItem(at: acrURL, resultingItemURL: nil)
                     }
                 }
 
                 // Remove from filesModel.photos array
                 if let index = filesModel.photos.firstIndex(where: { $0.id == photo.id }) {
                     filesModel.photos.remove(at: index)
-                    print("    ✓ Removed from photos array")
                 }
-
-                movedCount += 1
             } catch {
-                print("    ❌ Failed to move photo to trash: \(error)")
-                failedCount += 1
+                // Silently handle errors
             }
         }
 
@@ -357,8 +322,6 @@ class ThumbGridViewModel: ObservableObject {
         } else {
             filesModel.selectedPhoto = nil
         }
-
-        print("✅ Moved \(movedCount) photos to trash" + (failedCount > 0 ? ", \(failedCount) failed" : ""))
     }
 
     func getSelectedPhotosForBulkAction() -> [PhotoItem] {
@@ -367,7 +330,6 @@ class ThumbGridViewModel: ObservableObject {
         } else if let selectedPhoto = filesModel.selectedPhoto {
             return [selectedPhoto]
         } else {
-            print("DEBUG: No photos selected for bulk action")
             return []
         }
     }
@@ -409,20 +371,13 @@ class ThumbGridViewModel: ObservableObject {
     }
 
     func clearInvalidFilters() {
-        print("🔍 clearInvalidFilters called")
-        print("  - Current selectedLabels: \(selectedLabels)")
-        print("  - Total photos count: \(photos.count)")
-
         guard !selectedLabels.isEmpty else {
-            print("  - No filters selected, skipping")
             return
         }
 
         var labelsToRemove: Set<String> = []
 
         for label in selectedLabels {
-            print("  - Checking label: '\(label)'")
-
             // Check if any photo matches this label
             let hasMatchingPhoto = photos.contains { photo in
                 if label == "To Delete" && photo.toDelete {
@@ -438,8 +393,6 @@ class ThumbGridViewModel: ObservableObject {
                 return photoLabel == label && !photo.toDelete
             }
 
-            print("    - Has matching photos: \(hasMatchingPhoto)")
-
             if !hasMatchingPhoto {
                 labelsToRemove.insert(label)
             }
@@ -447,11 +400,7 @@ class ThumbGridViewModel: ObservableObject {
 
         // Remove invalid labels
         if !labelsToRemove.isEmpty {
-            print("🧹 Clearing invalid filters: \(labelsToRemove.joined(separator: ", "))")
             selectedLabels.subtract(labelsToRemove)
-            print("  - Updated selectedLabels: \(selectedLabels)")
-        } else {
-            print("  - No invalid filters to clear")
         }
     }
 
@@ -483,7 +432,6 @@ class ThumbGridViewModel: ObservableObject {
                 xmpContent = try String(contentsOf: xmpFileURL, encoding: .utf8)
                 xmpContent = XmpParser.updateRating(in: xmpContent, rating: rating)
             } catch {
-                print("⚠️ Failed to read existing XMP file: \(error)")
                 return
             }
         } else {
@@ -496,7 +444,7 @@ class ThumbGridViewModel: ObservableObject {
                 updatePhotoWithXmpMetadata(photo: photo, xmpMetadata: parsedMetadata)
             }
         } catch {
-            print("❌ Failed to save XMP file: \(error)")
+            // Silently handle error
         }
     }
 
@@ -521,7 +469,6 @@ class ThumbGridViewModel: ObservableObject {
                 let newLabel: String? = (currentLabel == targetLabel) ? nil : targetLabel
                 xmpContent = updateXmpLabel(in: xmpContent, newLabel: newLabel)
             } catch {
-                print("⚠️ Failed to read existing XMP file: \(error)")
                 return
             }
         } else {
@@ -534,7 +481,7 @@ class ThumbGridViewModel: ObservableObject {
                 updatePhotoWithXmpMetadata(photo: photo, xmpMetadata: parsedMetadata)
             }
         } catch {
-            print("❌ Failed to save XMP file: \(error)")
+            // Silently handle error
         }
     }
 
@@ -558,7 +505,7 @@ class ThumbGridViewModel: ObservableObject {
                 updatePhotoWithXmpMetadata(photo: photo, xmpMetadata: parsedMetadata)
             }
         } catch {
-            print("❌ Failed to remove label: \(error)")
+            // Silently handle error
         }
     }
 

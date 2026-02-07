@@ -82,7 +82,6 @@ class ExternalAppManager: ObservableObject {
                         url: URL(fileURLWithPath: path)
                     )
                     apps.append(photoApp)
-                    print("Found compatible app: \(name) (bundle ID: \(bundleID))")
                 }
             }
 
@@ -126,11 +125,9 @@ class ExternalAppManager: ObservableObject {
             let configuration = NSWorkspace.OpenConfiguration()
             NSWorkspace.shared.open(urls, withApplicationAt: app.url, configuration: configuration) { app, error in
                 if let error = error {
-                    print("Failed to open photos with \(selectedApp?.displayName ?? "selected app"): \(error)")
                     // Fallback to default application
                     self.openPhotosWithDefaultApp(urls)
                 } else {
-                    print("Opened \(urls.count) photos with \(selectedApp?.displayName ?? "selected app")")
                 }
             }
         } else {
@@ -152,14 +149,11 @@ class ExternalAppManager: ObservableObject {
             let configuration = NSWorkspace.OpenConfiguration()
             NSWorkspace.shared.open(urls, withApplicationAt: defaultAppURL, configuration: configuration) { (app, error) in
                 if let error = error {
-                    print("Failed to open photos with default app: \(error)")
                 } else {
-                    print("Opened \(urls.count) photos with default app")
                 }
             }
         } else {
             // Fallback - open each URL individually
-            print("No default app found, opening \(urls.count) photos individually")
             for url in urls {
                 NSWorkspace.shared.open(url)
             }

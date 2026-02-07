@@ -203,7 +203,6 @@ class XmpParser {
 
     /// Update or add an XMP attribute using XML parsing with regex fallback
     private static func updateXmpAttributeXML(in xmpContent: String, attribute: String, value: String) -> String {
-        print("🔧 Attempting to update attribute: \(attribute) = \(value)")
 
         // First try XML parsing
         do {
@@ -217,40 +216,32 @@ class XmpParser {
             let nodes = try xmlDoc.nodes(forXPath: xpath)
 
             guard let descriptionElement = nodes.first as? XMLElement else {
-                print("❌ Could not find rdf:Description element, falling back to regex")
                 return updateXmpAttributeRegex(in: xmpContent, attribute: attribute, value: value)
             }
 
-            print("✅ Found rdf:Description element")
 
             // Remove existing attribute if present
             if let existingAttr = descriptionElement.attribute(forName: attribute) {
                 descriptionElement.removeAttribute(forName: attribute)
-                print("🗑️ Removed existing attribute: \(attribute)")
             }
 
             // Add the new attribute
             let newAttribute = XMLNode.attribute(withName: attribute, stringValue: value) as! XMLNode
             descriptionElement.addAttribute(newAttribute)
-            print("➕ Added attribute: \(attribute) = \(value)")
 
             // Update MetadataDate
             updateMetadataDate(in: descriptionElement)
 
             let result = formatXmpContent(xmlDoc.xmlString)
-            print("✅ XML update completed successfully")
             return result
 
         } catch {
-            print("❌ XML parsing error: \(error)")
-            print("❌ Falling back to regex approach")
             return updateXmpAttributeRegex(in: xmpContent, attribute: attribute, value: value)
         }
     }
 
     /// Remove an XMP attribute using XML parsing with regex fallback
     private static func removeXmpAttributeXML(from xmpContent: String, attribute: String) -> String {
-        print("🗑️ Attempting to remove attribute: \(attribute)")
 
         // First try XML parsing
         do {
@@ -264,28 +255,22 @@ class XmpParser {
             let nodes = try xmlDoc.nodes(forXPath: xpath)
 
             guard let descriptionElement = nodes.first as? XMLElement else {
-                print("❌ Could not find rdf:Description element, falling back to regex")
                 return removeXmpAttributeRegex(from: xmpContent, attribute: attribute)
             }
 
             // Remove the attribute if it exists
             if descriptionElement.attribute(forName: attribute) != nil {
                 descriptionElement.removeAttribute(forName: attribute)
-                print("✅ Removed attribute: \(attribute)")
             } else {
-                print("ℹ️ Attribute \(attribute) not found, nothing to remove")
             }
 
             // Update MetadataDate
             updateMetadataDate(in: descriptionElement)
 
             let result = formatXmpContent(xmlDoc.xmlString)
-            print("✅ XML removal completed successfully")
             return result
 
         } catch {
-            print("❌ XML parsing error: \(error)")
-            print("❌ Falling back to regex approach")
             return removeXmpAttributeRegex(from: xmpContent, attribute: attribute)
         }
     }
@@ -306,7 +291,6 @@ class XmpParser {
 
     /// Regex-based fallback for updating attributes
     private static func updateXmpAttributeRegex(in xmpContent: String, attribute: String, value: String) -> String {
-        print("🔄 Using regex approach for attribute: \(attribute)")
         var result = xmpContent
 
         // Escape the attribute name for regex
@@ -318,13 +302,11 @@ class XmpParser {
             if regex.firstMatch(in: result, options: [], range: range) != nil {
                 // Replace existing attribute
                 result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: "\(attribute)=\"\(value)\"")
-                print("✅ Updated existing attribute with regex")
             } else {
                 // Add new attribute before the closing >
                 if let range = result.range(of: "<rdf:Description[^>]*>", options: .regularExpression) {
                     let insertPosition = result.index(before: range.upperBound)
                     result.insert(contentsOf: "\n           \(attribute)=\"\(value)\"", at: insertPosition)
-                    print("✅ Added new attribute with regex")
                 }
             }
         }
@@ -338,7 +320,6 @@ class XmpParser {
 
     /// Regex-based fallback for removing attributes
     private static func removeXmpAttributeRegex(from xmpContent: String, attribute: String) -> String {
-        print("🔄 Using regex approach to remove attribute: \(attribute)")
         var result = xmpContent
 
         // Pattern to match the attribute and its value, including surrounding whitespace
@@ -348,7 +329,6 @@ class XmpParser {
         if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
             let range = NSRange(location: 0, length: result.count)
             result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: "")
-            print("✅ Removed attribute with regex")
         }
 
         // Update MetadataDate with regex
@@ -388,7 +368,6 @@ class XmpParser {
             return formatAttributes(in: formattedXML)
 
         } catch {
-            print("❌ XML formatting error: \(error), returning original content")
             return xmpContent
         }
     }
