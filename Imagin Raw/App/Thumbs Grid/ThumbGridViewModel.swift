@@ -236,19 +236,25 @@ class ThumbGridViewModel: ObservableObject {
 
     // MARK: - Rating & Label Management
     func applyRating(_ rating: Int, to photos: [PhotoItem]) {
-        for photo in photos {
+        // Only apply rating to RAW files
+        let rawPhotos = photos.filter { $0.isRawFile }
+        for photo in rawPhotos {
             setPhotoRating(photo: photo, rating: rating)
         }
     }
 
     func applyLabel(_ label: String, to photos: [PhotoItem]) {
-        for photo in photos {
+        // Only apply labels to RAW files
+        let rawPhotos = photos.filter { $0.isRawFile }
+        for photo in rawPhotos {
             createAndSaveXmpFile(for: photo, targetLabel: label)
         }
     }
 
     func removeLabels(from photos: [PhotoItem]) {
-        for photo in photos {
+        // Only remove labels from RAW files
+        let rawPhotos = photos.filter { $0.isRawFile }
+        for photo in rawPhotos {
             removeAnyLabel(for: photo)
         }
     }

@@ -108,23 +108,23 @@ struct ThumbCell: View {
             }
 
             // Fixed-height container for filename and stars to prevent jumping
-            VStack(spacing: isHovering || currentRating > 0 ? 0 : 2) { // Tighter spacing when stars show
+            VStack(spacing: (isHovering || currentRating > 0) && photo.isRawFile ? 0 : 2) { // Tighter spacing when stars show
                 // Filename with colored pill background based on label
                 Text(filename)
                     .font(.system(size: 11)) // Keep consistent font size
                     .lineLimit(1)
                     .padding(.horizontal, 4)
-                    .padding(.vertical, isHovering || currentRating > 0 ? 2 : 4) // Tighter padding when stars show
+                    .padding(.vertical, (isHovering || currentRating > 0) && photo.isRawFile ? 2 : 4) // Tighter padding when stars show
                     .background(
                         RoundedRectangle(cornerRadius: 4)
                             .fill(getLabelBackgroundColor())
                             .opacity(hasLabel() ? 1 : 0)
                     )
                     .foregroundColor(getLabelTextColor())
-                    .offset(y: isHovering || currentRating > 0 ? -2 : 0) // Move up 2px when stars show
+                    .offset(y: (isHovering || currentRating > 0) && photo.isRawFile ? -2 : 0) // Move up 2px when stars show
 
-                // Star rating - show when hovering or when photo has rating
-                if isHovering || currentRating > 0 {
+                // Star rating - show when hovering or when photo has rating (only for RAW files)
+                if photo.isRawFile && (isHovering || currentRating > 0) {
                     StarRatingView(
                         rating: currentRating,
                         maxRating: 5,
@@ -144,7 +144,8 @@ struct ThumbCell: View {
         }
         .contentShape(Rectangle()) // Make entire cell area hoverable
         .onHover { hovering in
-            isHovering = hovering
+            // Only enable hover state for RAW files
+            isHovering = photo.isRawFile && hovering
         }
         .contextMenu {
             Button(action: {

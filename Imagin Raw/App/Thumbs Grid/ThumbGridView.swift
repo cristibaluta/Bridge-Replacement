@@ -341,9 +341,13 @@ struct ThumbGridView: View {
 
         let key = keyPress.characters
 
+        // Filter to only RAW files for rating and labeling operations
+        let rawPhotos = photos.filter { $0.isRawFile }
+        guard !rawPhotos.isEmpty else { return .ignored }
+
         // Rating keys (1-5)
         if let rating = Int(key), rating >= 1 && rating <= 5 {
-            viewModel.applyRating(rating, to: photos)
+            viewModel.applyRating(rating, to: rawPhotos)
             return .handled
         }
 
@@ -357,17 +361,17 @@ struct ThumbGridView: View {
         ]
 
         if let label = labelMap[key] {
-            viewModel.applyLabel(label, to: photos)
+            viewModel.applyLabel(label, to: rawPhotos)
             return .handled
         }
 
         // Remove label
         if key == "-" {
-            viewModel.removeLabels(from: photos)
+            viewModel.removeLabels(from: rawPhotos)
             return .handled
         }
 
-        // Toggle delete state
+        // Toggle delete state (works for all files)
         if key == "\u{7F}" || key == "d" || key == "D" {
             viewModel.toggleDeleteState(for: photos)
             return .handled

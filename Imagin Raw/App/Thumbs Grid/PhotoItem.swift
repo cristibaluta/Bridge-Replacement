@@ -43,4 +43,14 @@ struct PhotoItem: Identifiable, Hashable {
         self.toDelete = toDelete
         self.hasACR = hasACR
     }
+    
+    // Computed property to check if this is a RAW file
+    var isRawFile: Bool {
+        let rawExtensions = ["arw", "orf", "rw2", "cr2", "cr3", "crw", "nef", "nrw",
+                           "srf", "sr2", "raw", "raf", "pef", "ptx", "dng", "3fr",
+                           "fff", "iiq", "mef", "mos", "x3f", "srw", "dcr", "kdc",
+                           "k25", "kc2", "mrw", "erf", "bay", "ndd", "sti", "rwl", "r3d"]
+        let fileExtension = URL(fileURLWithPath: path).pathExtension.lowercased()
+        return rawExtensions.contains(fileExtension)
+    }
 }
