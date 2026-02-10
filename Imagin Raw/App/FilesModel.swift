@@ -382,7 +382,14 @@ func loadPhotos(in folder: FolderItem?) -> [PhotoItem] {
             // Check for ACR file
             let hasACR = acrLookup.contains(baseName)
 
-            return PhotoItem(path: imageFile.path, xmp: xmp, dateCreated: creationDate, hasACR: hasACR)
+            // Extract in-camera rating from RAW file (Canon IPTC StarRating)
+            let inCameraRating: Int? = if rawExtensions.contains(imageFile.pathExtension.lowercased()) {
+                RawWrapper.shared().extractCanonRating(fromFile: imageFile.path)?.intValue
+            } else {
+                nil
+            }
+
+            return PhotoItem(path: imageFile.path, xmp: xmp, dateCreated: creationDate, hasACR: hasACR, inCameraRating: inCameraRating)
         }
 }
 

@@ -25,7 +25,11 @@ struct ThumbCell: View {
     }
 
     private var currentRating: Int {
-        return photo.xmp?.rating ?? 0
+        // Use XMP rating if available, otherwise fallback to in-camera rating
+        if let xmpRating = photo.xmp?.rating, xmpRating > 0 {
+            return xmpRating
+        }
+        return photo.inCameraRating ?? 0
     }
 
     var body: some View {
