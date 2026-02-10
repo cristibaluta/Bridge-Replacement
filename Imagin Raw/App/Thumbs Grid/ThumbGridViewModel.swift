@@ -203,6 +203,10 @@ class ThumbGridViewModel: ObservableObject {
         return cachingQueueCount > 0
     }
 
+    var isLoadingMetadata: Bool {
+        return filesModel.isLoadingMetadata
+    }
+
     // MARK: - Selection Management
     func handlePhotoTap(photo: PhotoItem, modifiers: NSEvent.ModifierFlags) {
         let photoIndex = filteredPhotos.firstIndex(where: { $0.id == photo.id }) ?? 0

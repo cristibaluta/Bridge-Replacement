@@ -471,6 +471,7 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
     }
     @Published var selectedPhoto: PhotoItem?
     @Published var photos: [PhotoItem] = []
+    @Published var isLoadingMetadata: Bool = false
 
     // Flag to prevent photo loading when in copy mode
     var isInCopyMode: Bool = false
@@ -714,10 +715,12 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
         photos = loadPhotos(in: selectedFolder)
 
         // Load metadata asynchronously in the background
+        isLoadingMetadata = true
         Task {
             let photosWithMetadata = await loadPhotosMetadataAsync(in: selectedFolder, photos: photos)
             await MainActor.run {
                 self.photos = photosWithMetadata
+                self.isLoadingMetadata = false
             }
         }
     }
