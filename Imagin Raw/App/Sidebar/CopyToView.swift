@@ -11,7 +11,7 @@ struct CopyToView: View {
     @EnvironmentObject var filesModel: FilesModel
     @Environment(\.dismiss) private var dismiss
     let photosToCoрy: [PhotoItem]
-    
+
     @State private var selectedDestination: FolderItem?
     @State private var isCopying = false
     @State private var copyProgress: Double = 0.0
@@ -19,7 +19,7 @@ struct CopyToView: View {
     @State private var copiedCount: Int = 0
     @State private var totalCount: Int = 0
     @State private var copyError: String?
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -29,25 +29,32 @@ struct CopyToView: View {
                 Spacer()
             }
             .padding()
-            
+
             Divider()
-            
+
             // Folder selection view
-            SidebarView(onDoubleClick: nil, hideBottomBar: true)
-                .environmentObject(filesModel)
-                .onChange(of: filesModel.selectedFolder) { oldValue, newValue in
-                    selectedDestination = newValue
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(filesModel.rootFolders) { folder in
+                        FolderRowForCopy(
+                            folder: folder,
+                            selectedFolder: $selectedDestination,
+                            isDisabled: isCopying
+                        )
+                    }
                 }
-                .disabled(isCopying)
-            
+                .padding(.vertical, 8)
+            }
+            .disabled(isCopying)
+
             Divider()
-            
+
             // Progress section (only visible when copying)
             if isCopying {
                 VStack(spacing: 8) {
                     ProgressView(value: copyProgress, total: 1.0)
                         .progressViewStyle(.linear)
-                    
+
                     HStack {
                         Text("Copying: \(currentFile)")
                             .font(.caption)
@@ -60,10 +67,10 @@ struct CopyToView: View {
                     }
                 }
                 .padding()
-                
+
                 Divider()
             }
-            
+
             // Error message
             if let error = copyError {
                 HStack {
@@ -75,19 +82,19 @@ struct CopyToView: View {
                     Spacer()
                 }
                 .padding()
-                
+
                 Divider()
             }
-            
+
             // Bottom buttons
             HStack(spacing: 12) {
                 Button("Cancel") {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
-                
+
                 Spacer()
-                
+
                 Button("Copy") {
                     performCopy()
                 }
@@ -101,26 +108,26 @@ struct CopyToView: View {
             selectedDestination = filesModel.selectedFolder
         }
     }
-    
+
     private func performCopy() {
         guard let destination = selectedDestination else { return }
-        
+
         isCopying = true
         copyProgress = 0.0
         copyError = nil
         copiedCount = 0
-        
+
         // Count total files to copy (RAW + potential JPGs)
         var filesToCopy: [(source: URL, filename: String)] = []
-        
+
         for photo in photosToCoрy {
             let photoURL = URL(fileURLWithPath: photo.path)
             let baseName = photoURL.deletingPathExtension().lastPathComponent
             let directory = photoURL.deletingLastPathComponent()
-            
+
             // Add the RAW file
             filesToCopy.append((source: photoURL, filename: photoURL.lastPathComponent))
-            
+
             // Check for associated JPG
             for jpgExt in ["jpg", "jpeg", "JPG", "JPEG"] {
                 let jpgURL = directory.appendingPathComponent("\(baseName).\(jpgExt)")
@@ -130,20 +137,20 @@ struct CopyToView: View {
                 }
             }
         }
-        
+
         totalCount = filesToCopy.count
-        
+
         // Perform copy on background thread
         DispatchQueue.global(qos: .userInitiated).async {
             let destinationURL = destination.url
-            
+
             for (index, file) in filesToCopy.enumerated() {
                 DispatchQueue.main.async {
                     currentFile = file.filename
                 }
-                
+
                 let destinationFileURL = destinationURL.appendingPathComponent(file.filename)
-                
+
                 do {
                     // Check if file already exists
                     if FileManager.default.fileExists(atPath: destinationFileURL.path) {
@@ -154,10 +161,10 @@ struct CopyToView: View {
                         }
                         continue
                     }
-                    
+
                     // Copy the file
                     try FileManager.default.copyItem(at: file.source, to: destinationFileURL)
-                    
+
                     DispatchQueue.main.async {
                         copiedCount += 1
                         copyProgress = Double(copiedCount) / Double(totalCount)
@@ -169,7 +176,7 @@ struct CopyToView: View {
                     break
                 }
             }
-            
+
             // Complete
             DispatchQueue.main.async {
                 if copyError == nil {
@@ -179,6 +186,76 @@ struct CopyToView: View {
                     }
                 } else {
                     isCopying = false
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Folder Row for Copy Destination
+struct FolderRowForCopy: View {
+    let folder: FolderItem
+    @Binding var selectedFolder: FolderItem?
+    let isDisabled: Bool
+    @State private var isExpanded: Bool = true
+
+    private var isSelected: Bool {
+        selectedFolder?.url == folder.url
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                // Disclosure triangle
+                if let children = folder.children, !children.isEmpty {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 12)
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isExpanded.toggle()
+                            }
+                        }
+                } else {
+                    Spacer()
+                        .frame(width: 12)
+                }
+
+                // Folder icon
+                Image(systemName: "folder.fill")
+                    .foregroundColor(.blue)
+                    .font(.system(size: 14))
+
+                // Folder name
+                Text(folder.url.lastPathComponent)
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+            .cornerRadius(4)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if !isDisabled {
+                    selectedFolder = folder
+                }
+            }
+
+            // Subfolders
+            if isExpanded, let children = folder.children, !children.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(children) { subfolder in
+                        FolderRowForCopy(
+                            folder: subfolder,
+                            selectedFolder: $selectedFolder,
+                            isDisabled: isDisabled
+                        )
+                        .padding(.leading, 16)
+                    }
                 }
             }
         }
