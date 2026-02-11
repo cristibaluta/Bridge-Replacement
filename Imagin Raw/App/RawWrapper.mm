@@ -219,9 +219,9 @@
     }
 }
 
-// Extract Canon in-camera rating using ImageIO framework
+// Extract metadata (rating, width, height) using ImageIO framework
 // Canon stores the in-camera rating in IPTC metadata as StarRating
-- (NSNumber *)extractCanonRatingFromFile:(NSString *)path {
+- (NSDictionary *)extractMetadata:(NSString *)path {
     NSURL *fileURL = [NSURL fileURLWithPath:path];
     CGImageSourceRef imageSource = CGImageSourceCreateWithURL((__bridge CFURLRef)fileURL, NULL);
 
@@ -229,93 +229,84 @@
         return nil;
     }
 
-    NSNumber *rating = nil;
+    NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
 
-    // Get image properties including EXIF, IPTC, and MakerNote
+    // Get image properties including EXIF, IPTC, and dimensions
     CFDictionaryRef imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, NULL);
     if (imageProperties) {
         NSDictionary *properties = (__bridge_transfer NSDictionary *)imageProperties;
 
+        // Extract rating
         // Check IPTC dictionary for StarRating (this is where Canon stores in-camera rating)
         NSDictionary *iptcDict = properties[(NSString *)kCGImagePropertyIPTCDictionary];
         if (iptcDict) {
             NSNumber *starRating = iptcDict[@"StarRating"];
             if (starRating && [starRating intValue] > 0) {
-                rating = starRating;
+                metadata[@"rating"] = starRating;
             }
         }
 
         // Fallback: Check standard EXIF rating if IPTC not found
-        if (!rating) {
+        if (!metadata[@"rating"]) {
             NSDictionary *exifDict = properties[(NSString *)kCGImagePropertyExifDictionary];
             if (exifDict) {
                 NSNumber *exifRating = exifDict[@"UserRating"];
                 if (exifRating && [exifRating intValue] > 0) {
-                    rating = exifRating;
+                    metadata[@"rating"] = exifRating;
                 }
             }
+        }
+
+        // Extract resolution
+        NSNumber *width = properties[(NSString *)kCGImagePropertyPixelWidth];
+        NSNumber *height = properties[(NSString *)kCGImagePropertyPixelHeight];
+
+        if (width && height) {
+            metadata[@"width"] = width;
+            metadata[@"height"] = height;
         }
     }
 
     CFRelease(imageSource);
-    return rating;
-}
 
-// Extract image resolution (width and height) from RAW or other image files
-- (NSDictionary *)extractImageResolution:(NSString *)path {
-    NSURL *fileURL = [NSURL fileURLWithPath:path];
+    // If we didn't get resolution from ImageIO, try LibRaw for RAW files
+    if (!metadata[@"width"] || !metadata[@"height"]) {
+        __block NSDictionary *librawResolution = nil;
 
-    // First, try using ImageIO for quick resolution extraction (works for most formats)
-    CGImageSourceRef imageSource = CGImageSourceCreateWithURL((__bridge CFURLRef)fileURL, NULL);
+        dispatch_sync([[self class] librawQueue], ^{
+            LibRaw *raw = new LibRaw();
 
-    if (imageSource) {
-        CFDictionaryRef imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, NULL);
-        if (imageProperties) {
-            NSDictionary *properties = (__bridge_transfer NSDictionary *)imageProperties;
+            @try {
+                int ret = raw->open_file(path.UTF8String);
+                if (ret == LIBRAW_SUCCESS) {
+                    // Use the visible image dimensions (after cropping)
+                    int width = raw->imgdata.sizes.width;
+                    int height = raw->imgdata.sizes.height;
 
-            NSNumber *width = properties[(NSString *)kCGImagePropertyPixelWidth];
-            NSNumber *height = properties[(NSString *)kCGImagePropertyPixelHeight];
+                    if (width > 0 && height > 0) {
+                        librawResolution = @{@"width": @(width), @"height": @(height)};
+                    }
 
-            CFRelease(imageSource);
-
-            if (width && height) {
-                return @{@"width": width, @"height": height};
-            }
-        }
-        CFRelease(imageSource);
-    }
-
-    // Fallback to LibRaw for RAW files if ImageIO didn't work
-    __block NSDictionary *result = nil;
-
-    dispatch_sync([[self class] librawQueue], ^{
-        LibRaw *raw = new LibRaw();
-
-        @try {
-            int ret = raw->open_file(path.UTF8String);
-            if (ret == LIBRAW_SUCCESS) {
-                // Use the visible image dimensions (after cropping)
-                int width = raw->imgdata.sizes.width;
-                int height = raw->imgdata.sizes.height;
-
-                if (width > 0 && height > 0) {
-                    result = @{@"width": @(width), @"height": @(height)};
+                    raw->recycle();
                 }
-
-                raw->recycle();
-            }
-            delete raw;
-        }
-        @catch (NSException *exception) {
-            if (raw) {
-                raw->recycle();
                 delete raw;
             }
-            NSLog(@"LibRaw exception in extractImageResolution: %@", exception);
-        }
-    });
+            @catch (NSException *exception) {
+                if (raw) {
+                    raw->recycle();
+                    delete raw;
+                }
+                NSLog(@"LibRaw exception in extractMetadata: %@", exception);
+            }
+        });
 
-    return result;
+        if (librawResolution) {
+            metadata[@"width"] = librawResolution[@"width"];
+            metadata[@"height"] = librawResolution[@"height"];
+        }
+    }
+
+    return metadata.count > 0 ? metadata : nil;
 }
 
 @end

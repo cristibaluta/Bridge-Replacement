@@ -105,7 +105,7 @@ struct LargePreviewView: View {
 
         Task.detached(priority: .userInitiated) {
             let (loadedImage, extractedExifData) = await loadImageWithExif(from: photo.path)
-            
+
             await MainActor.run {
                 self.preview = loadedImage
                 self.exifData = extractedExifData
@@ -129,7 +129,8 @@ struct LargePreviewView: View {
             guard let rawPhoto = RawWrapper.shared().extractRawPhoto(path) else {
                 return (nil, nil)
             }
-            let rating = RawWrapper.shared().extractCanonRating(fromFile: path)
+            let metadata = RawWrapper.shared().extractMetadata(path)
+            let rating = metadata?["rating"] as? NSNumber
             print(rating)
 
             // Store EXIF data for display

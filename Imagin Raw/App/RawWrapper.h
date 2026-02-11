@@ -15,8 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)shared;
 - (nullable RawPhoto *)extractRawPhoto:(NSString *)path;
 - (nullable NSData *)extractEmbeddedJPEG:(NSString *)path; // Keep for backward compatibility
-- (nullable NSNumber *)extractCanonRatingFromFile:(NSString *)path; // Extract Canon in-camera rating
-- (nullable NSDictionary *)extractImageResolution:(NSString *)path; // Extract image width and height
+- (nullable NSDictionary *)extractMetadata:(NSString *)path; // Extract rating, width, and height (returns @{@"rating": NSNumber, @"width": NSNumber, @"height": NSNumber})
 
 @end
 

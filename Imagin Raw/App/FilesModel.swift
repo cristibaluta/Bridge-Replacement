@@ -428,21 +428,18 @@ func loadPhotosMetadataAsync(in folder: FolderItem?, photos: [PhotoItem]) async 
                     nil
                 }
 
-                let inCameraRating: Int? = if isRaw {
-                    RawWrapper.shared().extractCanonRating(fromFile: photo.path)?.intValue
-                } else {
-                    nil
-                }
-
                 // Get file size
                 let fileSize: Int64? = (try? fm.attributesOfItem(atPath: photo.path))?[.size] as? Int64
 
-                // Get image resolution
+                // Extract metadata (rating, width, height) in a single call
+                var inCameraRating: Int? = nil
                 var width: Int? = nil
                 var height: Int? = nil
-                if let resolution = RawWrapper.shared().extractImageResolution(photo.path) {
-                    width = (resolution["width"] as? NSNumber)?.intValue
-                    height = (resolution["height"] as? NSNumber)?.intValue
+
+                if let metadata = RawWrapper.shared().extractMetadata(photo.path) {
+                    inCameraRating = (metadata["rating"] as? NSNumber)?.intValue
+                    width = (metadata["width"] as? NSNumber)?.intValue
+                    height = (metadata["height"] as? NSNumber)?.intValue
                 }
 
                 return (index, xmp, inCameraRating, isRaw, fileSize, width, height)
