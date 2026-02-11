@@ -406,7 +406,6 @@ struct ContentView: View {
                 path: photo.path,
                 xmp: xmpMetadata,
                 dateCreated: photo.dateCreated,
-                toDelete: currentPhoto.toDelete
                 toDelete: currentPhoto.toDelete,
                 hasACR: currentPhoto.hasACR,
                 hasJPG: currentPhoto.hasJPG,
