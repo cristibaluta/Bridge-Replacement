@@ -6,57 +6,69 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct CopyToView: View {
-    @EnvironmentObject var filesModel: FilesModel
     @Environment(\.dismiss) private var dismiss
     let photosToCoрy: [PhotoItem]
+    let destinationURL: URL
 
-    @State private var isCopying = false
+    var body: some View {
+        CopyProgressView(
+            photosToCoрy: photosToCoрy,
+            destinationURL: destinationURL,
+            onComplete: {
+                dismiss()
+            },
+            onCancel: {
+                dismiss()
+            }
+        )
+        .frame(minWidth: 500, minHeight: 180)
+    }
+}
+
+struct CopyProgressView: View {
+    let photosToCoрy: [PhotoItem]
+    let destinationURL: URL
+    let onComplete: () -> Void
+    let onCancel: () -> Void
+
     @State private var copyProgress: Double = 0.0
     @State private var currentFile: String = ""
     @State private var copiedCount: Int = 0
     @State private var totalCount: Int = 0
     @State private var copyError: String?
+    @State private var isCancelled = false
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 16) {
             // Header
-            HStack {
-                Text("Copy \(photosToCoрy.count) photo\(photosToCoрy.count == 1 ? "" : "s") to...")
-                    .font(.headline)
-                Spacer()
-            }
-            .padding()
+            Text("Copying Files...")
+                .font(.headline)
 
-            Divider()
+            // Progress bar
+            ProgressView(value: copyProgress, total: 1.0)
+                .progressViewStyle(.linear)
+                .frame(height: 8)
 
-            // Folder selection view - Reuse the existing SidebarView
-            FoldersListView()
-                .disabled(isCopying)
-
-            Divider()
-
-            // Progress section (only visible when copying)
-            if isCopying {
-                VStack(spacing: 8) {
-                    ProgressView(value: copyProgress, total: 1.0)
-                        .progressViewStyle(.linear)
-
-                    HStack {
-                        Text("Copying: \(currentFile)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("\(copiedCount) of \(totalCount)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+            // Current file and count
+            VStack(spacing: 4) {
+                HStack {
+                    Text("Copying: \(currentFile)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
                 }
-                .padding()
 
-                Divider()
+                HStack {
+                    Text("\(copiedCount) of \(totalCount)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
             }
 
             // Error message
@@ -67,49 +79,31 @@ struct CopyToView: View {
                     Text(error)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .lineLimit(2)
                     Spacer()
                 }
-                .padding()
-
-                Divider()
             }
 
-            // Bottom buttons
-            HStack(spacing: 12) {
-                Button("Cancel") {
-                    dismiss()
+            // Cancel button
+            HStack {
+                Spacer()
+                Button(copyError != nil ? "Close" : "Cancel") {
+                    if copyError == nil {
+                        isCancelled = true
+                    }
+                    onCancel()
                 }
                 .keyboardShortcut(.cancelAction)
-
-                Spacer()
-
-                Button("Copy") {
-                    performCopy()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(filesModel.selectedFolder == nil || isCopying)
             }
-            .padding()
         }
-        .frame(width: 400, height: 600)
+        .padding(20)
+        .frame(minWidth: 500, minHeight: 180)
         .onAppear {
-            // Enable copy mode to prevent photo loading
-            filesModel.isInCopyMode = true
-        }
-        .onDisappear {
-            // Disable copy mode when popover closes
-            filesModel.isInCopyMode = false
+            performCopy()
         }
     }
 
     private func performCopy() {
-        guard let destinationURL = filesModel.selectedFolder?.url else { return }
-
-        isCopying = true
-        copyProgress = 0.0
-        copyError = nil
-        copiedCount = 0
-
         // Count total files to copy (RAW + potential JPGs)
         var filesToCopy: [(source: URL, filename: String)] = []
 
@@ -132,10 +126,16 @@ struct CopyToView: View {
         }
 
         totalCount = filesToCopy.count
+        currentFile = "Preparing..."
 
         // Perform copy on background thread
         DispatchQueue.global(qos: .userInitiated).async {
-            for (_, file) in filesToCopy.enumerated() {
+            for (index, file) in filesToCopy.enumerated() {
+                // Check if cancelled
+                if isCancelled {
+                    break
+                }
+
                 DispatchQueue.main.async {
                     currentFile = file.filename
                 }
@@ -145,9 +145,9 @@ struct CopyToView: View {
                 do {
                     // Check if file already exists
                     if FileManager.default.fileExists(atPath: destinationFileURL.path) {
-                        // Skip or handle conflict - for now, skip
+                        // Skip files that already exist
                         DispatchQueue.main.async {
-                            copiedCount += 1
+                            copiedCount = index + 1
                             copyProgress = Double(copiedCount) / Double(totalCount)
                         }
                         continue
@@ -157,7 +157,7 @@ struct CopyToView: View {
                     try FileManager.default.copyItem(at: file.source, to: destinationFileURL)
 
                     DispatchQueue.main.async {
-                        copiedCount += 1
+                        copiedCount = index + 1
                         copyProgress = Double(copiedCount) / Double(totalCount)
                     }
                 } catch {
@@ -170,13 +170,11 @@ struct CopyToView: View {
 
             // Complete
             DispatchQueue.main.async {
-                if copyError == nil {
+                if copyError == nil && !isCancelled {
                     // Success - close the dialog after a brief delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        dismiss()
+                        onComplete()
                     }
-                } else {
-                    isCopying = false
                 }
             }
         }

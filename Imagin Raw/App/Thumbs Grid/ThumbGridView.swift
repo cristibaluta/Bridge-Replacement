@@ -21,6 +21,7 @@ struct ThumbGridView: View {
     @State private var showSortPopover = false
     @State private var showGridTypePopover = false
     @State private var showCopyToSheet = false
+    @State private var copyDestinationURL: URL?
     @State private var photosToCopy: [PhotoItem] = []
 
     init(filesModel: FilesModel, selectedApp: PhotoApp?, onOpenSelectedPhotos: (([PhotoItem]) -> Void)?, onEnterReviewMode: (() -> Void)?) {
@@ -52,7 +53,7 @@ struct ThumbGridView: View {
         .fixedSize(horizontal: true, vertical: false)
         .preference(key: GridWidthPreferenceKey.self, value: viewModel.gridWidth)
         .sheet(isPresented: $showCopyToSheet) {
-            CopyToView(photosToCoрy: photosToCopy)
+            CopyToView(photosToCoрy: photosToCopy, destinationURL: copyDestinationURL ?? URL(fileURLWithPath: "/"))
                 .environmentObject(filesModel)
                 .interactiveDismissDisabled(false)
         }
@@ -120,17 +121,17 @@ struct ThumbGridView: View {
                 viewModel.initializeSelection()
             }
             .onChange(of: filesModel.photos) { oldPhotos, newPhotos in
-                // Clear invalid filters when photos change (e.g., folder switch)
-                viewModel.clearInvalidFilters()
-
                 if filesModel.selectedPhoto == nil && !newPhotos.isEmpty {
                     filesModel.selectedPhoto = newPhotos.first
                 }
             }
+            .onChange(of: filesModel.isLoadingMetadata) { oldValue, newValue in
+                // When metadata loading completes, clear invalid filters
+                if oldValue == true && newValue == false {
+                    viewModel.clearInvalidFilters()
+                }
+            }
             .onChange(of: filesModel.selectedFolder) {
-                // Clear invalid filters before selecting photos
-                viewModel.clearInvalidFilters()
-
                 // Scroll to top and select first photo when folder changes
                 if let firstPhoto = viewModel.filteredPhotos.first {
                     // Select the first photo
@@ -181,7 +182,7 @@ struct ThumbGridView: View {
                     // Right-clicked photo is not selected - copy only this one
                     photosToCopy = [rightClickedPhoto]
                 }
-                showCopyToSheet = true
+                showFolderPicker()
             },
             size: viewModel.gridType.thumbSize
         )
@@ -422,6 +423,24 @@ struct ThumbGridView: View {
                 scrollView.scrollerStyle = .legacy
                 scrollView.hasVerticalScroller = true
                 scrollView.autohidesScrollers = false
+            }
+        }
+    }
+
+    private func showFolderPicker() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Destination Folder"
+        panel.message = "Select a folder to copy \(photosToCopy.count) photo\(photosToCopy.count == 1 ? "" : "s") to"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+
+        panel.begin { [self] response in
+            if response == .OK, let url = panel.url {
+                copyDestinationURL = url
+                showCopyToSheet = true
             }
         }
     }
