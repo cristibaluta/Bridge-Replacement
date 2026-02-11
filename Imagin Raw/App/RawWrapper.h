@@ -16,6 +16,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable RawPhoto *)extractRawPhoto:(NSString *)path;
 - (nullable NSData *)extractEmbeddedJPEG:(NSString *)path; // Keep for backward compatibility
 - (nullable NSNumber *)extractCanonRatingFromFile:(NSString *)path; // Extract Canon in-camera rating
+- (nullable NSDictionary *)extractImageResolution:(NSString *)path; // Extract image width and height
 
 @end
 

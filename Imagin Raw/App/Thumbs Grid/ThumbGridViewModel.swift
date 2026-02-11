@@ -623,7 +623,14 @@ class ThumbGridViewModel: ObservableObject {
                 path: currentPhoto.path,
                 xmp: currentPhoto.xmp,
                 dateCreated: currentPhoto.dateCreated,
-                toDelete: !currentPhoto.toDelete
+                toDelete: !currentPhoto.toDelete,
+                hasACR: currentPhoto.hasACR,
+                hasJPG: currentPhoto.hasJPG,
+                inCameraRating: currentPhoto.inCameraRating,
+                isRawFile: currentPhoto.isRawFile,
+                fileSizeBytes: currentPhoto.fileSizeBytes,
+                width: currentPhoto.width,
+                height: currentPhoto.height
             )
 
             filesModel.photos[photoIndex] = updatedPhoto
@@ -640,7 +647,14 @@ class ThumbGridViewModel: ObservableObject {
                 path: photo.path,
                 xmp: xmpMetadata,
                 dateCreated: photo.dateCreated,
-                toDelete: currentPhoto.toDelete
+                toDelete: currentPhoto.toDelete,
+                hasACR: currentPhoto.hasACR,
+                hasJPG: currentPhoto.hasJPG,
+                inCameraRating: currentPhoto.inCameraRating,
+                isRawFile: currentPhoto.isRawFile,
+                fileSizeBytes: currentPhoto.fileSizeBytes,
+                width: currentPhoto.width,
+                height: currentPhoto.height
             )
 
             filesModel.photos[photoIndex] = updatedPhoto

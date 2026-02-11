@@ -407,6 +407,14 @@ struct ContentView: View {
                 xmp: xmpMetadata,
                 dateCreated: photo.dateCreated,
                 toDelete: currentPhoto.toDelete
+                toDelete: currentPhoto.toDelete,
+                hasACR: currentPhoto.hasACR,
+                hasJPG: currentPhoto.hasJPG,
+                inCameraRating: currentPhoto.inCameraRating,
+                isRawFile: currentPhoto.isRawFile,
+                fileSizeBytes: currentPhoto.fileSizeBytes,
+                width: currentPhoto.width,
+                height: currentPhoto.height
             )
 
             // Update the photos array directly (since BrowserModel is @Published)
@@ -430,7 +438,14 @@ struct ContentView: View {
                 path: currentPhoto.path,
                 xmp: currentPhoto.xmp,
                 dateCreated: currentPhoto.dateCreated,
-                toDelete: !currentPhoto.toDelete
+                toDelete: !currentPhoto.toDelete,
+                hasACR: currentPhoto.hasACR,
+                hasJPG: currentPhoto.hasJPG,
+                inCameraRating: currentPhoto.inCameraRating,
+                isRawFile: currentPhoto.isRawFile,
+                fileSizeBytes: currentPhoto.fileSizeBytes,
+                width: currentPhoto.width,
+                height: currentPhoto.height
             )
 
             // Update the photos array directly

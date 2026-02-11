@@ -261,4 +261,61 @@
     return rating;
 }
 
+// Extract image resolution (width and height) from RAW or other image files
+- (NSDictionary *)extractImageResolution:(NSString *)path {
+    NSURL *fileURL = [NSURL fileURLWithPath:path];
+
+    // First, try using ImageIO for quick resolution extraction (works for most formats)
+    CGImageSourceRef imageSource = CGImageSourceCreateWithURL((__bridge CFURLRef)fileURL, NULL);
+
+    if (imageSource) {
+        CFDictionaryRef imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, NULL);
+        if (imageProperties) {
+            NSDictionary *properties = (__bridge_transfer NSDictionary *)imageProperties;
+
+            NSNumber *width = properties[(NSString *)kCGImagePropertyPixelWidth];
+            NSNumber *height = properties[(NSString *)kCGImagePropertyPixelHeight];
+
+            CFRelease(imageSource);
+
+            if (width && height) {
+                return @{@"width": width, @"height": height};
+            }
+        }
+        CFRelease(imageSource);
+    }
+
+    // Fallback to LibRaw for RAW files if ImageIO didn't work
+    __block NSDictionary *result = nil;
+
+    dispatch_sync([[self class] librawQueue], ^{
+        LibRaw *raw = new LibRaw();
+
+        @try {
+            int ret = raw->open_file(path.UTF8String);
+            if (ret == LIBRAW_SUCCESS) {
+                // Use the visible image dimensions (after cropping)
+                int width = raw->imgdata.sizes.width;
+                int height = raw->imgdata.sizes.height;
+
+                if (width > 0 && height > 0) {
+                    result = @{@"width": @(width), @"height": @(height)};
+                }
+
+                raw->recycle();
+            }
+            delete raw;
+        }
+        @catch (NSException *exception) {
+            if (raw) {
+                raw->recycle();
+                delete raw;
+            }
+            NSLog(@"LibRaw exception in extractImageResolution: %@", exception);
+        }
+    });
+
+    return result;
+}
+
 @end

@@ -414,11 +414,13 @@ func loadPhotosMetadataAsync(in folder: FolderItem?, photos: [PhotoItem]) async 
 
     let startTime = Date()
 
-    return await withTaskGroup(of: (Int, XmpMetadata?, Int?).self, returning: [PhotoItem].self) { group in
+    return await withTaskGroup(of: (Int, XmpMetadata?, Int?, Bool, Int64?, Int?, Int?).self, returning: [PhotoItem].self) { group in
         for (index, photo) in photos.enumerated() {
             group.addTask {
                 let url = URL(fileURLWithPath: photo.path)
                 let baseName = url.deletingPathExtension().lastPathComponent
+                let fileExtension = url.pathExtension.lowercased()
+                let isRaw = rawExtensions.contains(fileExtension)
 
                 let xmp: XmpMetadata? = if let xmpContent = xmpLookup[baseName] {
                     XmpParser.parseMetadata(from: xmpContent)
@@ -426,18 +428,29 @@ func loadPhotosMetadataAsync(in folder: FolderItem?, photos: [PhotoItem]) async 
                     nil
                 }
 
-                let inCameraRating: Int? = if rawExtensions.contains(url.pathExtension.lowercased()) {
+                let inCameraRating: Int? = if isRaw {
                     RawWrapper.shared().extractCanonRating(fromFile: photo.path)?.intValue
                 } else {
                     nil
                 }
 
-                return (index, xmp, inCameraRating)
+                // Get file size
+                let fileSize: Int64? = (try? fm.attributesOfItem(atPath: photo.path))?[.size] as? Int64
+
+                // Get image resolution
+                var width: Int? = nil
+                var height: Int? = nil
+                if let resolution = RawWrapper.shared().extractImageResolution(photo.path) {
+                    width = (resolution["width"] as? NSNumber)?.intValue
+                    height = (resolution["height"] as? NSNumber)?.intValue
+                }
+
+                return (index, xmp, inCameraRating, isRaw, fileSize, width, height)
             }
         }
 
         var updatedPhotos = photos
-        for await (index, xmp, rating) in group {
+        for await (index, xmp, rating, isRaw, fileSize, width, height) in group {
             updatedPhotos[index] = PhotoItem(
                 id: photos[index].id,
                 path: photos[index].path,
@@ -445,7 +458,11 @@ func loadPhotosMetadataAsync(in folder: FolderItem?, photos: [PhotoItem]) async 
                 dateCreated: photos[index].dateCreated,
                 hasACR: photos[index].hasACR,
                 hasJPG: photos[index].hasJPG,
-                inCameraRating: rating
+                inCameraRating: rating,
+                isRawFile: isRaw,
+                fileSizeBytes: fileSize,
+                width: width,
+                height: height
             )
         }
 
