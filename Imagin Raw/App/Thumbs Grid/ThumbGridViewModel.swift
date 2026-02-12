@@ -222,9 +222,10 @@ class ThumbGridViewModel: ObservableObject {
                 filesModel.selectedPhoto = photo
                 lastSelectedIndex = photoIndex
             }
-        } else if modifiers.contains(.shift) && lastSelectedIndex != nil {
-            let startIndex = min(lastSelectedIndex!, photoIndex)
-            let endIndex = max(lastSelectedIndex!, photoIndex)
+        } else if modifiers.contains(.shift) {
+            let lastSelectedIndex = self.lastSelectedIndex ?? 0
+            let startIndex = min(lastSelectedIndex, photoIndex)
+            let endIndex = max(lastSelectedIndex, photoIndex)
 
             for index in startIndex...endIndex {
                 selectedPhotos.insert(filteredPhotos[index].id)
