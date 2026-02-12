@@ -47,9 +47,7 @@ struct ThumbGridView: View {
                 filterSortBar
             }
         }
-        .frame(width: viewModel.gridWidth)
-        .fixedSize(horizontal: true, vertical: false)
-        .preference(key: GridWidthPreferenceKey.self, value: viewModel.gridWidth)
+        .preference(key: GridWidthPreferenceKey.self, value: viewModel.gridWidth+16)
         .sheet(isPresented: $showCopyToSheet) {
             CopyToView(photosToCoрy: viewModel.photosToCopy, destinationURL: viewModel.copyDestinationURL ?? URL(fileURLWithPath: "/"))
                 .environmentObject(filesModel)
@@ -96,7 +94,7 @@ struct ThumbGridView: View {
     }
 
     private func photoGridView(proxy: ScrollViewProxy, geometry: GeometryProxy) -> some View {
-        let content = ScrollView(.vertical, showsIndicators: true) {
+        let content = ScrollView(.vertical) {
             LazyVGrid(columns: viewModel.dynamicColumns, spacing: 8) {
                 ForEach(viewModel.filteredPhotos, id: \.id) { photo in
                     createThumbCell(for: photo)

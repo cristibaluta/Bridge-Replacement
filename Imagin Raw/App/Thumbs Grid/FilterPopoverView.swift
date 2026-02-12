@@ -118,7 +118,7 @@ struct FilterPopoverView: View {
             }
         }
         .padding(16)
-        .frame(minWidth: 300)
+        .frame(minWidth: 350)
     }
 }
 
