@@ -154,21 +154,20 @@ class ThumbGridViewModel: ObservableObject {
 
     var availableLabels: [String] {
         var labelSet = Set<String>()
-        var hasNoLabel = false
         var hasToDelete = false
 
         for photo in photos {
             if photo.toDelete {
                 hasToDelete = true
-            } else if let label = photo.xmp?.label, !label.isEmpty {
+            }
+            if let label = photo.xmp?.label, !label.isEmpty {
                 labelSet.insert(label)
-            } else {
-                hasNoLabel = true
             }
         }
 
         var result: [String] = []
-        if hasNoLabel {
+        if labelSet.count > 0 {
+            // We add No Label only if there are any of the other labels
             result.append("No Label")
         }
 

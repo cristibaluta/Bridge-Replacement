@@ -250,6 +250,21 @@ struct ThumbGridView: View {
                     .buttonStyle(PlainButtonStyle())
                     .help(label)
                 }
+
+                if true {
+                    Button(action: {
+                        if viewModel.selectedRatings.isEmpty {
+                            viewModel.selectedRatings = [1, 2, 3, 4, 5]
+                        } else {
+                            viewModel.selectedRatings = []
+                        }
+                    }) {
+                        Image(systemName: viewModel.selectedRatings.isEmpty ? "star" : "star.fill")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("Filter by all ratings")
+                }
             }
             .padding(.horizontal, 4)
             .overlay(
