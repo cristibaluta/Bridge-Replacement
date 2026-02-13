@@ -470,6 +470,49 @@ class ThumbGridViewModel: ObservableObject {
                 selectedRatings.subtract(ratingsToRemove)
             }
         }
+
+        // After clearing invalid filters, check if any photos would match the remaining filters
+        // If we still have active filters but no photos match, clear all filters
+        if !photos.isEmpty && (!selectedLabels.isEmpty || !selectedRatings.isEmpty) {
+            // Manually check if any photo matches the remaining filters
+            let hasMatchingPhoto = photos.contains { photo in
+                var matchesLabel = selectedLabels.isEmpty
+                var matchesRating = selectedRatings.isEmpty
+
+                // Check label filter
+                if !selectedLabels.isEmpty {
+                    if selectedLabels.contains("To Delete") && photo.toDelete {
+                        matchesLabel = true
+                    } else {
+                        let photoLabel = photo.xmp?.label ?? ""
+                        if selectedLabels.contains("No Label") && photoLabel.isEmpty && !photo.toDelete {
+                            matchesLabel = true
+                        } else if selectedLabels.contains(photoLabel) && !photo.toDelete {
+                            matchesLabel = true
+                        }
+                    }
+                }
+
+                // Check rating filter
+                if !selectedRatings.isEmpty {
+                    let effectiveRating: Int
+                    if let xmpRating = photo.xmp?.rating, xmpRating > 0 {
+                        effectiveRating = xmpRating
+                    } else {
+                        effectiveRating = photo.inCameraRating ?? 0
+                    }
+                    matchesRating = selectedRatings.contains(effectiveRating)
+                }
+
+                return matchesLabel && matchesRating
+            }
+
+            // If no photos match the remaining filters, clear all filters
+            if !hasMatchingPhoto {
+                selectedLabels.removeAll()
+                selectedRatings.removeAll()
+            }
+        }
     }
 
     func getColorForLabel(_ label: String) -> Color {
@@ -634,7 +677,9 @@ class ThumbGridViewModel: ObservableObject {
                 isRawFile: currentPhoto.isRawFile,
                 fileSizeBytes: currentPhoto.fileSizeBytes,
                 width: currentPhoto.width,
-                height: currentPhoto.height
+                height: currentPhoto.height,
+                cameraMake: currentPhoto.cameraMake,
+                cameraModel: currentPhoto.cameraModel
             )
 
             filesModel.photos[photoIndex] = updatedPhoto
@@ -658,7 +703,9 @@ class ThumbGridViewModel: ObservableObject {
                 isRawFile: currentPhoto.isRawFile,
                 fileSizeBytes: currentPhoto.fileSizeBytes,
                 width: currentPhoto.width,
-                height: currentPhoto.height
+                height: currentPhoto.height,
+                cameraMake: currentPhoto.cameraMake,
+                cameraModel: currentPhoto.cameraModel
             )
 
             filesModel.photos[photoIndex] = updatedPhoto

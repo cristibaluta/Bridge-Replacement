@@ -428,7 +428,7 @@ func loadPhotosMetadataAsync(in folder: FolderItem?, photos: [PhotoItem]) async 
 
     let startTime = Date()
 
-    return await withTaskGroup(of: (Int, XmpMetadata?, Int?, Bool, Int64?, Int?, Int?).self, returning: [PhotoItem].self) { group in
+    return await withTaskGroup(of: (Int, XmpMetadata?, Int?, Bool, Int64?, Int?, Int?, String?, String?).self, returning: [PhotoItem].self) { group in
         for (index, photo) in photos.enumerated() {
             group.addTask {
                 let url = URL(fileURLWithPath: photo.path)
@@ -445,23 +445,27 @@ func loadPhotosMetadataAsync(in folder: FolderItem?, photos: [PhotoItem]) async 
                 // Get file size
                 let fileSize: Int64? = (try? fm.attributesOfItem(atPath: photo.path))?[.size] as? Int64
 
-                // Extract metadata (rating, width, height) in a single call
+                // Extract metadata (rating, width, height, camera info) in a single call
                 var inCameraRating: Int? = nil
                 var width: Int? = nil
                 var height: Int? = nil
+                var cameraMake: String? = nil
+                var cameraModel: String? = nil
 
                 if let metadata = RawWrapper.shared().extractMetadata(photo.path) {
                     inCameraRating = (metadata["rating"] as? NSNumber)?.intValue
                     width = (metadata["width"] as? NSNumber)?.intValue
                     height = (metadata["height"] as? NSNumber)?.intValue
+                    cameraMake = metadata["cameraMake"] as? String
+                    cameraModel = metadata["cameraModel"] as? String
                 }
 
-                return (index, xmp, inCameraRating, isRaw, fileSize, width, height)
+                return (index, xmp, inCameraRating, isRaw, fileSize, width, height, cameraMake, cameraModel)
             }
         }
 
         var updatedPhotos = photos
-        for await (index, xmp, rating, isRaw, fileSize, width, height) in group {
+        for await (index, xmp, rating, isRaw, fileSize, width, height, cameraMake, cameraModel) in group {
             updatedPhotos[index] = PhotoItem(
                 id: photos[index].id,
                 path: photos[index].path,
@@ -473,7 +477,9 @@ func loadPhotosMetadataAsync(in folder: FolderItem?, photos: [PhotoItem]) async 
                 isRawFile: isRaw,
                 fileSizeBytes: fileSize,
                 width: width,
-                height: height
+                height: height,
+                cameraMake: cameraMake,
+                cameraModel: cameraModel
             )
         }
 
@@ -514,7 +520,10 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
     }
 
     deinit {
+        // Stop file monitoring
         fileMonitor.stopAllMonitoring()
+
+        // Stop accessing all security-scoped resources
         for url in accessedURLs {
             url.stopAccessingSecurityScopedResource()
         }
@@ -527,13 +536,21 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
             print("Ignore folder contents change event in copy mode")
             return
         }
+        // Find and refresh the affected folder in our tree
         refreshFolderTree(for: url)
 
         // If this is the currently selected folder or a parent of it, refresh the photos and thumbnails
         if let selectedFolder = selectedFolder {
             if selectedFolder.url == url || url.path.hasPrefix(selectedFolder.url.path) {
+
+                // Stop any pending thumbnail requests
                 ThumbsManager.shared.stopQueue()
+
+                // Reload photos for the selected folder
                 loadPhotosForSelectedFolder()
+
+                // Trigger thumbnail regeneration for the new photo list
+                // This will happen automatically when the photos array is updated due to @Published
             }
         }
     }
@@ -725,9 +742,7 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
 
     private func loadPhotosForSelectedFolder() {
         // Don't load photos if we're in copy mode (selecting destination folder)
-        guard !isInCopyMode else {
-            return
-        }
+        guard !isInCopyMode else { return }
 
         photos = loadPhotos(in: selectedFolder)
         isLoadingMetadata = true
@@ -739,5 +754,5 @@ final class FilesModel: ObservableObject, FileSystemMonitorDelegate {
             }
         }
     }
-    
+
 }

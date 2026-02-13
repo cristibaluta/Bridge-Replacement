@@ -18,6 +18,7 @@ struct CopyToView: View {
     @State private var renameByExifDate = false
     @State private var customPrefix = ""
     @State private var organizeByDate = false
+    @State private var organizeJpgsInSubfolder = false
 
     var body: some View {
         if showProgressView, let destination = destinationURL {
@@ -28,6 +29,7 @@ struct CopyToView: View {
                 renameByExifDate: renameByExifDate,
                 customPrefix: customPrefix,
                 organizeByDate: organizeByDate,
+                organizeJpgsInSubfolder: organizeJpgsInSubfolder,
                 onComplete: {
                     dismiss()
                 },
@@ -44,6 +46,7 @@ struct CopyToView: View {
                 renameByExifDate: $renameByExifDate,
                 customPrefix: $customPrefix,
                 organizeByDate: $organizeByDate,
+                organizeJpgsInSubfolder: $organizeJpgsInSubfolder,
                 onStart: {
                     showProgressView = true
                 },
@@ -63,6 +66,7 @@ struct CopyOptionsView: View {
     @Binding var renameByExifDate: Bool
     @Binding var customPrefix: String
     @Binding var organizeByDate: Bool
+    @Binding var organizeJpgsInSubfolder: Bool
     let onStart: () -> Void
     let onCancel: () -> Void
 
@@ -176,6 +180,17 @@ struct CopyOptionsView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+
+                // Organize JPGs in subfolder
+                Toggle(isOn: $organizeJpgsInSubfolder) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Copy JPGs to _jpg subfolder")
+                            .font(.body)
+                        Text("Separates JPG counterparts into a _jpg subfolder")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
 
             Spacer()
@@ -229,6 +244,7 @@ struct CopyProgressView: View {
     let renameByExifDate: Bool
     let customPrefix: String
     let organizeByDate: Bool
+    let organizeJpgsInSubfolder: Bool
     let onComplete: () -> Void
     let onCancel: () -> Void
 
@@ -309,7 +325,7 @@ struct CopyProgressView: View {
 
     private func performCopy() {
         // Count total files to copy (RAW + potential JPGs)
-        var filesToCopy: [(source: URL, photo: PhotoItem?, filename: String)] = []
+        var filesToCopy: [(source: URL, photo: PhotoItem?, filename: String, isJpg: Bool)] = []
 
         for photo in photosToCoрy {
             let photoURL = URL(fileURLWithPath: photo.path)
@@ -317,13 +333,13 @@ struct CopyProgressView: View {
             let directory = photoURL.deletingLastPathComponent()
 
             // Add the RAW file
-            filesToCopy.append((source: photoURL, photo: photo, filename: photoURL.lastPathComponent))
+            filesToCopy.append((source: photoURL, photo: photo, filename: photoURL.lastPathComponent, isJpg: false))
 
             // Check for associated JPG
             for jpgExt in ["jpg", "jpeg", "JPG", "JPEG"] {
                 let jpgURL = directory.appendingPathComponent("\(baseName).\(jpgExt)")
                 if FileManager.default.fileExists(atPath: jpgURL.path) {
-                    filesToCopy.append((source: jpgURL, photo: nil, filename: jpgURL.lastPathComponent))
+                    filesToCopy.append((source: jpgURL, photo: nil, filename: jpgURL.lastPathComponent, isJpg: true))
                     break // Only add the first JPG found
                 }
             }
@@ -379,6 +395,14 @@ struct CopyProgressView: View {
                         destinationFolder = baseURL.appendingPathComponent(folderName)
 
                         // Create subfolder if it doesn't exist
+                        try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
+                    }
+
+                    // If this is a JPG and the option is enabled, put it in _jpg subfolder
+                    if file.isJpg && organizeJpgsInSubfolder {
+                        destinationFolder = destinationFolder.appendingPathComponent("_jpg")
+
+                        // Create _jpg subfolder if it doesn't exist
                         try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
                     }
 

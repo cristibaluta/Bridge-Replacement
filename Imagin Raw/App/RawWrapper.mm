@@ -236,6 +236,20 @@
     if (imageProperties) {
         NSDictionary *properties = (__bridge_transfer NSDictionary *)imageProperties;
 
+        // Extract camera make and model
+        NSDictionary *tiffDict = properties[(NSString *)kCGImagePropertyTIFFDictionary];
+        if (tiffDict) {
+            NSString *make = tiffDict[(NSString *)kCGImagePropertyTIFFMake];
+            NSString *model = tiffDict[(NSString *)kCGImagePropertyTIFFModel];
+
+            if (make && make.length > 0) {
+                metadata[@"cameraMake"] = make;
+            }
+            if (model && model.length > 0) {
+                metadata[@"cameraModel"] = model;
+            }
+        }
+
         // Extract rating
         // Check IPTC dictionary for StarRating (this is where Canon stores in-camera rating)
         NSDictionary *iptcDict = properties[(NSString *)kCGImagePropertyIPTCDictionary];

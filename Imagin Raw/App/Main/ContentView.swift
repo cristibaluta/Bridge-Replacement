@@ -414,7 +414,9 @@ struct ContentView: View {
                 isRawFile: currentPhoto.isRawFile,
                 fileSizeBytes: currentPhoto.fileSizeBytes,
                 width: currentPhoto.width,
-                height: currentPhoto.height
+                height: currentPhoto.height,
+                cameraMake: currentPhoto.cameraMake,
+                cameraModel: currentPhoto.cameraModel
             )
 
             // Update the photos array directly (since BrowserModel is @Published)
@@ -445,7 +447,9 @@ struct ContentView: View {
                 isRawFile: currentPhoto.isRawFile,
                 fileSizeBytes: currentPhoto.fileSizeBytes,
                 width: currentPhoto.width,
-                height: currentPhoto.height
+                height: currentPhoto.height,
+                cameraMake: currentPhoto.cameraMake,
+                cameraModel: currentPhoto.cameraModel
             )
 
             // Update the photos array directly
