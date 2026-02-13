@@ -13,6 +13,7 @@ struct CopyToView: View {
     let photosToCoрy: [PhotoItem]
 
     @State private var destinationURL: URL?
+    @State private var backupDestinationURL: URL?
     @State private var showProgressView = false
     @State private var renameByExifDate = false
     @State private var customPrefix = ""
@@ -23,6 +24,7 @@ struct CopyToView: View {
             CopyProgressView(
                 photosToCoрy: photosToCoрy,
                 destinationURL: destination,
+                backupDestinationURL: backupDestinationURL,
                 renameByExifDate: renameByExifDate,
                 customPrefix: customPrefix,
                 organizeByDate: organizeByDate,
@@ -38,6 +40,7 @@ struct CopyToView: View {
             CopyOptionsView(
                 photosCount: photosToCoрy.count,
                 destinationURL: $destinationURL,
+                backupDestinationURL: $backupDestinationURL,
                 renameByExifDate: $renameByExifDate,
                 customPrefix: $customPrefix,
                 organizeByDate: $organizeByDate,
@@ -48,7 +51,7 @@ struct CopyToView: View {
                     dismiss()
                 }
             )
-            .frame(minWidth: 500, minHeight: 320)
+            .frame(minWidth: 500, minHeight: 380)
         }
     }
 }
@@ -56,6 +59,7 @@ struct CopyToView: View {
 struct CopyOptionsView: View {
     let photosCount: Int
     @Binding var destinationURL: URL?
+    @Binding var backupDestinationURL: URL?
     @Binding var renameByExifDate: Bool
     @Binding var customPrefix: String
     @Binding var organizeByDate: Bool
@@ -78,7 +82,7 @@ struct CopyOptionsView: View {
 
             // Destination folder selection
             VStack(alignment: .leading, spacing: 8) {
-                Text("Destination:")
+                Text("Primary Destination:")
                     .font(.body)
 
                 HStack {
@@ -97,7 +101,43 @@ struct CopyOptionsView: View {
                     }
 
                     Button("Browse...") {
-                        showFolderPicker()
+                        showFolderPicker(forBackup: false)
+                    }
+                }
+            }
+
+            // Backup destination folder selection
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Backup Destination (Optional):")
+                    .font(.body)
+
+                HStack {
+                    if let url = backupDestinationURL {
+                        Text(url.path)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text("No backup folder selected")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Button("Browse...") {
+                        showFolderPicker(forBackup: true)
+                    }
+
+                    if backupDestinationURL != nil {
+                        Button(action: {
+                            backupDestinationURL = nil
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -160,9 +200,9 @@ struct CopyOptionsView: View {
         .padding(20)
     }
 
-    private func showFolderPicker() {
+    private func showFolderPicker(forBackup: Bool) {
         let panel = NSOpenPanel()
-        panel.title = "Choose Destination Folder"
+        panel.title = forBackup ? "Choose Backup Destination Folder" : "Choose Destination Folder"
         panel.message = "Select a folder to copy \(photosCount) photo\(photosCount == 1 ? "" : "s") to"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -172,7 +212,11 @@ struct CopyOptionsView: View {
 
         panel.begin { response in
             if response == .OK, let url = panel.url {
-                destinationURL = url
+                if forBackup {
+                    backupDestinationURL = url
+                } else {
+                    destinationURL = url
+                }
             }
         }
     }
@@ -181,6 +225,7 @@ struct CopyOptionsView: View {
 struct CopyProgressView: View {
     let photosToCoрy: [PhotoItem]
     let destinationURL: URL
+    let backupDestinationURL: URL?
     let renameByExifDate: Bool
     let customPrefix: String
     let organizeByDate: Bool
@@ -199,6 +244,12 @@ struct CopyProgressView: View {
             // Header
             Text("Copying Files...")
                 .font(.headline)
+
+            if backupDestinationURL != nil {
+                Text("Copying to primary and backup destinations")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             // Progress bar
             ProgressView(value: copyProgress, total: 1.0)
@@ -316,42 +367,40 @@ struct CopyProgressView: View {
                     }
                 }
 
-                // Determine destination folder
-                var destinationFolder = destinationURL
+                // Helper function to copy to a destination
+                func copyToDestination(_ baseURL: URL) throws {
+                    var destinationFolder = baseURL
 
-                // Organize by date if option is enabled and we have photo metadata
-                if organizeByDate, let photo = file.photo {
-                    let dateFormatter = DateFormatter()
-                    dateFormatter.dateFormat = "MM-dd"
-                    let folderName = dateFormatter.string(from: photo.dateCreated)
-                    destinationFolder = destinationURL.appendingPathComponent(folderName)
+                    // Organize by date if option is enabled and we have photo metadata
+                    if organizeByDate, let photo = file.photo {
+                        let dateFormatter = DateFormatter()
+                        dateFormatter.dateFormat = "MM-dd"
+                        let folderName = dateFormatter.string(from: photo.dateCreated)
+                        destinationFolder = baseURL.appendingPathComponent(folderName)
 
-                    // Create subfolder if it doesn't exist
-                    do {
+                        // Create subfolder if it doesn't exist
                         try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
-                    } catch {
-                        DispatchQueue.main.async {
-                            copyError = "Failed to create folder \(folderName): \(error.localizedDescription)"
-                        }
-                        break
                     }
-                }
 
-                let destinationFileURL = destinationFolder.appendingPathComponent(newFilename)
+                    let destinationFileURL = destinationFolder.appendingPathComponent(newFilename)
 
-                do {
-                    // Check if file already exists
+                    // Skip if file already exists
                     if FileManager.default.fileExists(atPath: destinationFileURL.path) {
-                        // Skip files that already exist
-                        DispatchQueue.main.async {
-                            copiedCount = index + 1
-                            copyProgress = Double(copiedCount) / Double(totalCount)
-                        }
-                        continue
+                        return
                     }
 
                     // Copy the file
                     try FileManager.default.copyItem(at: file.source, to: destinationFileURL)
+                }
+
+                do {
+                    // Copy to primary destination
+                    try copyToDestination(destinationURL)
+
+                    // Copy to backup destination if provided
+                    if let backupURL = backupDestinationURL {
+                        try copyToDestination(backupURL)
+                    }
 
                     DispatchQueue.main.async {
                         copiedCount = index + 1
