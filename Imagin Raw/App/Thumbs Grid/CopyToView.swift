@@ -21,44 +21,138 @@ struct CopyToView: View {
     @State private var organizeByCameraModel = false
     @State private var organizeJpgsInSubfolder = false
 
-    var body: some View {
-        if showProgressView, let destination = destinationURL {
-            CopyProgressView(
-                photosToCoрy: photosToCoрy,
-                destinationURL: destination,
-                backupDestinationURL: backupDestinationURL,
-                renameByExifDate: renameByExifDate,
-                customPrefix: customPrefix,
-                organizeByDate: organizeByDate,
-                organizeByCameraModel: organizeByCameraModel,
-                organizeJpgsInSubfolder: organizeJpgsInSubfolder,
-                onComplete: {
-                    dismiss()
-                },
-                onCancel: {
-                    dismiss()
-                }
-            )
-            .frame(minWidth: 500, minHeight: 180)
+    // UserDefaults keys
+    private let renameByExifDateKey = "CopyTo_RenameByExifDate"
+    private let customPrefixKey = "CopyTo_CustomPrefix"
+    private let organizeByDateKey = "CopyTo_OrganizeByDate"
+    private let organizeByCameraModelKey = "CopyTo_OrganizeByCameraModel"
+    private let organizeJpgsInSubfolderKey = "CopyTo_OrganizeJpgsInSubfolder"
+    private let lastDestinationURLKey = "CopyTo_LastDestinationURL"
+    private let lastBackupDestinationURLKey = "CopyTo_LastBackupDestinationURL"
+    private let destinationBookmarkKey = "CopyTo_DestinationBookmark"
+    private let backupBookmarkKey = "CopyTo_BackupBookmark"
+
+    init(photosToCoрy: [PhotoItem]) {
+        self.photosToCoрy = photosToCoрy
+
+        // Load saved settings
+        _renameByExifDate = State(initialValue: UserDefaults.standard.bool(forKey: renameByExifDateKey))
+        _customPrefix = State(initialValue: UserDefaults.standard.string(forKey: customPrefixKey) ?? "")
+        _organizeByDate = State(initialValue: UserDefaults.standard.bool(forKey: organizeByDateKey))
+        _organizeByCameraModel = State(initialValue: UserDefaults.standard.bool(forKey: organizeByCameraModelKey))
+        _organizeJpgsInSubfolder = State(initialValue: UserDefaults.standard.bool(forKey: organizeJpgsInSubfolderKey))
+
+        // Load last destinations from security-scoped bookmarks
+        if let bookmarkData = UserDefaults.standard.data(forKey: destinationBookmarkKey) {
+            if let url = Self.urlFromBookmark(bookmarkData) {
+                _destinationURL = State(initialValue: url)
+            }
+        }
+        if let bookmarkData = UserDefaults.standard.data(forKey: backupBookmarkKey) {
+            if let url = Self.urlFromBookmark(bookmarkData) {
+                _backupDestinationURL = State(initialValue: url)
+            }
+        }
+    }
+
+    private static func urlFromBookmark(_ bookmarkData: Data) -> URL? {
+        var isStale = false
+        do {
+            let url = try URL(resolvingBookmarkData: bookmarkData, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale)
+            if isStale {
+                // Bookmark is stale, will need to recreate it
+                return nil
+            }
+            // Start accessing the security-scoped resource
+            _ = url.startAccessingSecurityScopedResource()
+            return url
+        } catch {
+            print("Error resolving bookmark: \(error)")
+            return nil
+        }
+    }
+
+    private static func bookmarkFromURL(_ url: URL) -> Data? {
+        do {
+            let bookmarkData = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+            return bookmarkData
+        } catch {
+            print("Error creating bookmark: \(error)")
+            return nil
+        }
+    }
+
+    private func saveSettings() {
+        UserDefaults.standard.set(renameByExifDate, forKey: renameByExifDateKey)
+        UserDefaults.standard.set(customPrefix, forKey: customPrefixKey)
+        UserDefaults.standard.set(organizeByDate, forKey: organizeByDateKey)
+        UserDefaults.standard.set(organizeByCameraModel, forKey: organizeByCameraModelKey)
+        UserDefaults.standard.set(organizeJpgsInSubfolder, forKey: organizeJpgsInSubfolderKey)
+
+        // Save security-scoped bookmarks
+        if let url = destinationURL {
+            if let bookmarkData = Self.bookmarkFromURL(url) {
+                UserDefaults.standard.set(bookmarkData, forKey: destinationBookmarkKey)
+            }
+            UserDefaults.standard.set(url.absoluteString, forKey: lastDestinationURLKey)
+        }
+        if let url = backupDestinationURL {
+            if let bookmarkData = Self.bookmarkFromURL(url) {
+                UserDefaults.standard.set(bookmarkData, forKey: backupBookmarkKey)
+            }
+            UserDefaults.standard.set(url.absoluteString, forKey: lastBackupDestinationURLKey)
         } else {
-            CopyOptionsView(
-                photosToCoрy: photosToCoрy,
-                photosCount: photosToCoрy.count,
-                destinationURL: $destinationURL,
-                backupDestinationURL: $backupDestinationURL,
-                renameByExifDate: $renameByExifDate,
-                customPrefix: $customPrefix,
-                organizeByDate: $organizeByDate,
-                organizeByCameraModel: $organizeByCameraModel,
-                organizeJpgsInSubfolder: $organizeJpgsInSubfolder,
-                onStart: {
-                    showProgressView = true
-                },
-                onCancel: {
-                    dismiss()
-                }
-            )
-            .frame(minWidth: 500, minHeight: 420)
+            UserDefaults.standard.removeObject(forKey: lastBackupDestinationURLKey)
+            UserDefaults.standard.removeObject(forKey: backupBookmarkKey)
+        }
+    }
+
+    var body: some View {
+        Group {
+            if showProgressView, let destination = destinationURL {
+                CopyProgressView(
+                    photosToCoрy: photosToCoрy,
+                    destinationURL: destination,
+                    backupDestinationURL: backupDestinationURL,
+                    renameByExifDate: renameByExifDate,
+                    customPrefix: customPrefix,
+                    organizeByDate: organizeByDate,
+                    organizeByCameraModel: organizeByCameraModel,
+                    organizeJpgsInSubfolder: organizeJpgsInSubfolder,
+                    onComplete: {
+                        dismiss()
+                    },
+                    onCancel: {
+                        dismiss()
+                    }
+                )
+                .frame(minWidth: 500, minHeight: 180)
+            } else {
+                CopyOptionsView(
+                    photosToCoрy: photosToCoрy,
+                    photosCount: photosToCoрy.count,
+                    destinationURL: $destinationURL,
+                    backupDestinationURL: $backupDestinationURL,
+                    renameByExifDate: $renameByExifDate,
+                    customPrefix: $customPrefix,
+                    organizeByDate: $organizeByDate,
+                    organizeByCameraModel: $organizeByCameraModel,
+                    organizeJpgsInSubfolder: $organizeJpgsInSubfolder,
+                    onStart: {
+                        saveSettings()
+                        showProgressView = true
+                    },
+                    onCancel: {
+                        dismiss()
+                    }
+                )
+                .frame(minWidth: 500, minHeight: 420)
+            }
+        }
+        .onDisappear {
+            // Stop accessing security-scoped resources when view disappears
+            destinationURL?.stopAccessingSecurityScopedResource()
+            backupDestinationURL?.stopAccessingSecurityScopedResource()
         }
     }
 }
@@ -85,12 +179,16 @@ struct CopyOptionsView: View {
 
         var components: [String] = [baseURL.path]
 
-        // Add date folder if enabled
+        // Add date folder if enabled (year/month/day structure)
         if organizeByDate {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MM-dd"
-            let folderName = dateFormatter.string(from: firstPhoto.dateCreated)
-            components.append(folderName)
+            let calendar = Calendar.current
+            let year = calendar.component(.year, from: firstPhoto.dateCreated)
+            let month = calendar.component(.month, from: firstPhoto.dateCreated)
+            let day = calendar.component(.day, from: firstPhoto.dateCreated)
+
+            components.append(String(year))
+            components.append(String(format: "%02d", month))
+            components.append(String(format: "%02d", day))
         }
 
         // Add camera model folder if enabled
@@ -227,6 +325,7 @@ struct CopyOptionsView: View {
                     // Custom prefix
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Custom prefix (optional)")
+                        Text("Prefix (optional)")
                             .font(.body)
                         TextField("e.g., Vacation_", text: $customPrefix)
                             .textFieldStyle(.roundedBorder)
@@ -238,7 +337,7 @@ struct CopyOptionsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Organize into subfolders by date")
                                 .font(.body)
-                            Text("Creates folders like: 02-13 (Month-Day)")
+                            Text("Creates folders structure (Year/Month/Day)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -419,11 +518,11 @@ struct CopyProgressView: View {
             // Add the RAW file
             filesToCopy.append((source: photoURL, photo: photo, filename: photoURL.lastPathComponent, isJpg: false))
 
-            // Check for associated JPG
+            // Check for associated JPG - use the same photo metadata so it goes to the same folder structure
             for jpgExt in ["jpg", "jpeg", "JPG", "JPEG"] {
                 let jpgURL = directory.appendingPathComponent("\(baseName).\(jpgExt)")
                 if FileManager.default.fileExists(atPath: jpgURL.path) {
-                    filesToCopy.append((source: jpgURL, photo: nil, filename: jpgURL.lastPathComponent, isJpg: true))
+                    filesToCopy.append((source: jpgURL, photo: photo, filename: jpgURL.lastPathComponent, isJpg: true))
                     break // Only add the first JPG found
                 }
             }
@@ -473,10 +572,16 @@ struct CopyProgressView: View {
 
                     // Organize by date if option is enabled and we have photo metadata
                     if organizeByDate, let photo = file.photo {
-                        let dateFormatter = DateFormatter()
-                        dateFormatter.dateFormat = "MM-dd"
-                        let folderName = dateFormatter.string(from: photo.dateCreated)
-                        destinationFolder = baseURL.appendingPathComponent(folderName)
+                        let calendar = Calendar.current
+                        let year = calendar.component(.year, from: photo.dateCreated)
+                        let month = calendar.component(.month, from: photo.dateCreated)
+                        let day = calendar.component(.day, from: photo.dateCreated)
+
+                        // Create year/month/day folder structure
+                        destinationFolder = baseURL
+                            .appendingPathComponent(String(year))
+                            .appendingPathComponent(String(format: "%02d", month))
+                            .appendingPathComponent(String(format: "%02d", day))
 
                         // Create subfolder if it doesn't exist
                         try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
