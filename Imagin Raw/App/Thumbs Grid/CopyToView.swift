@@ -9,10 +9,143 @@ import SwiftUI
 import AppKit
 
 struct CopyToView: View {
-    @EnvironmentObject var filesModel: FilesModel
     @Environment(\.dismiss) private var dismiss
     let photosToCoрy: [PhotoItem]
     let destinationURL: URL
+
+    @State private var showProgressView = false
+    @State private var renameByExifDate = false
+    @State private var customPrefix = ""
+    @State private var organizeByDate = false
+
+    var body: some View {
+        if showProgressView {
+            CopyProgressView(
+                photosToCoрy: photosToCoрy,
+                destinationURL: destinationURL,
+                renameByExifDate: renameByExifDate,
+                customPrefix: customPrefix,
+                organizeByDate: organizeByDate,
+                onComplete: {
+                    dismiss()
+                },
+                onCancel: {
+                    dismiss()
+                }
+            )
+            .frame(minWidth: 500, minHeight: 180)
+        } else {
+            CopyOptionsView(
+                photosCount: photosToCoрy.count,
+                destinationPath: destinationURL.path,
+                renameByExifDate: $renameByExifDate,
+                customPrefix: $customPrefix,
+                organizeByDate: $organizeByDate,
+                onStart: {
+                    showProgressView = true
+                },
+                onCancel: {
+                    dismiss()
+                }
+            )
+            .frame(minWidth: 500, minHeight: 300)
+        }
+    }
+}
+
+struct CopyOptionsView: View {
+    let photosCount: Int
+    let destinationPath: String
+    @Binding var renameByExifDate: Bool
+    @Binding var customPrefix: String
+    @Binding var organizeByDate: Bool
+    let onStart: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            // Header
+            VStack(spacing: 8) {
+                Text("Copy Options")
+                    .font(.headline)
+
+                Text("Copying \(photosCount) photo\(photosCount == 1 ? "" : "s") to:")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Text(destinationPath)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+            }
+
+            Divider()
+
+            // Options
+            VStack(alignment: .leading, spacing: 16) {
+                // Rename by EXIF date
+                Toggle(isOn: $renameByExifDate) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Rename files by EXIF date")
+                            .font(.body)
+                        Text("Format: YYYY-MM-DD_HHMMSS")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                // Custom prefix
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Custom prefix (optional)")
+                        .font(.body)
+                    TextField("e.g., Vacation_", text: $customPrefix)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 300)
+                }
+
+                // Organize by date
+                Toggle(isOn: $organizeByDate) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Organize into subfolders by date")
+                            .font(.body)
+                        Text("Creates folders like: 02-13 (Month-Day)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Buttons
+            HStack(spacing: 12) {
+                Button("Cancel") {
+                    onCancel()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Spacer()
+
+                Button("Start Copying") {
+                    onStart()
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(20)
+    }
+}
+
+struct CopyProgressView: View {
+    let photosToCoрy: [PhotoItem]
+    let destinationURL: URL
+    let renameByExifDate: Bool
+    let customPrefix: String
+    let organizeByDate: Bool
+    let onComplete: () -> Void
+    let onCancel: () -> Void
 
     @State private var copyProgress: Double = 0.0
     @State private var currentFile: String = ""
@@ -71,8 +204,7 @@ struct CopyToView: View {
                     if copyError == nil {
                         isCancelled = true
                     }
-                    print("press cancel")
-                    dismiss()
+                    onCancel()
                 }
                 .keyboardShortcut(.cancelAction)
             }
@@ -85,10 +217,8 @@ struct CopyToView: View {
     }
 
     private func performCopy() {
-        filesModel.isInCopyMode = true
-        print("sending photos to copy: \(photosToCoрy.count) destination: \(destinationURL)")
         // Count total files to copy (RAW + potential JPGs)
-        var filesToCopy: [(source: URL, filename: String)] = []
+        var filesToCopy: [(source: URL, photo: PhotoItem?, filename: String)] = []
 
         for photo in photosToCoрy {
             let photoURL = URL(fileURLWithPath: photo.path)
@@ -96,16 +226,14 @@ struct CopyToView: View {
             let directory = photoURL.deletingLastPathComponent()
 
             // Add the RAW file
-            filesToCopy.append((source: photoURL, filename: photoURL.lastPathComponent))
+            filesToCopy.append((source: photoURL, photo: photo, filename: photoURL.lastPathComponent))
 
-            if photo.isRawFile {
-                // Check for associated JPG
-                for jpgExt in ["jpg", "jpeg", "JPG", "JPEG"] {
-                    let jpgURL = directory.appendingPathComponent("\(baseName).\(jpgExt)")
-                    if FileManager.default.fileExists(atPath: jpgURL.path) {
-                        filesToCopy.append((source: jpgURL, filename: jpgURL.lastPathComponent))
-                        break // Only add the first JPG found
-                    }
+            // Check for associated JPG
+            for jpgExt in ["jpg", "jpeg", "JPG", "JPEG"] {
+                let jpgURL = directory.appendingPathComponent("\(baseName).\(jpgExt)")
+                if FileManager.default.fileExists(atPath: jpgURL.path) {
+                    filesToCopy.append((source: jpgURL, photo: nil, filename: jpgURL.lastPathComponent))
+                    break // Only add the first JPG found
                 }
             }
         }
@@ -118,16 +246,58 @@ struct CopyToView: View {
             for (index, file) in filesToCopy.enumerated() {
                 // Check if cancelled
                 if isCancelled {
-                    print("cancelled copy")
                     break
                 }
 
-                print("copying \(file)")
                 DispatchQueue.main.async {
                     currentFile = file.filename
                 }
 
-                let destinationFileURL = destinationURL.appendingPathComponent(file.filename)
+                // Determine destination filename and path
+                let originalFilename = file.filename
+                let fileExtension = file.source.pathExtension
+                var newFilename = originalFilename
+
+                // Apply custom prefix
+                if !customPrefix.isEmpty {
+                    newFilename = customPrefix + originalFilename
+                }
+
+                // Rename by EXIF date if option is enabled and we have photo metadata
+                if renameByExifDate, let photo = file.photo {
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
+                    let dateString = dateFormatter.string(from: photo.dateCreated)
+
+                    if !customPrefix.isEmpty {
+                        newFilename = customPrefix + dateString + "." + fileExtension
+                    } else {
+                        newFilename = dateString + "." + fileExtension
+                    }
+                }
+
+                // Determine destination folder
+                var destinationFolder = destinationURL
+
+                // Organize by date if option is enabled and we have photo metadata
+                if organizeByDate, let photo = file.photo {
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "MM-dd"
+                    let folderName = dateFormatter.string(from: photo.dateCreated)
+                    destinationFolder = destinationURL.appendingPathComponent(folderName)
+
+                    // Create subfolder if it doesn't exist
+                    do {
+                        try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
+                    } catch {
+                        DispatchQueue.main.async {
+                            copyError = "Failed to create folder \(folderName): \(error.localizedDescription)"
+                        }
+                        break
+                    }
+                }
+
+                let destinationFileURL = destinationFolder.appendingPathComponent(newFilename)
 
                 do {
                     // Check if file already exists
@@ -157,15 +327,13 @@ struct CopyToView: View {
 
             // Complete
             DispatchQueue.main.async {
-                filesModel.isInCopyMode = false
                 if copyError == nil && !isCancelled {
                     // Success - close the dialog after a brief delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        onComplete()
                     }
                 }
             }
         }
     }
-
 }
