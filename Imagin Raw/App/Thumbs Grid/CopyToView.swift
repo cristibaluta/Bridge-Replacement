@@ -18,6 +18,7 @@ struct CopyToView: View {
     @State private var renameByExifDate = false
     @State private var customPrefix = ""
     @State private var organizeByDate = false
+    @State private var organizeByCameraModel = false
     @State private var organizeJpgsInSubfolder = false
 
     var body: some View {
@@ -29,6 +30,7 @@ struct CopyToView: View {
                 renameByExifDate: renameByExifDate,
                 customPrefix: customPrefix,
                 organizeByDate: organizeByDate,
+                organizeByCameraModel: organizeByCameraModel,
                 organizeJpgsInSubfolder: organizeJpgsInSubfolder,
                 onComplete: {
                     dismiss()
@@ -40,12 +42,14 @@ struct CopyToView: View {
             .frame(minWidth: 500, minHeight: 180)
         } else {
             CopyOptionsView(
+                photosToCoрy: photosToCoрy,
                 photosCount: photosToCoрy.count,
                 destinationURL: $destinationURL,
                 backupDestinationURL: $backupDestinationURL,
                 renameByExifDate: $renameByExifDate,
                 customPrefix: $customPrefix,
                 organizeByDate: $organizeByDate,
+                organizeByCameraModel: $organizeByCameraModel,
                 organizeJpgsInSubfolder: $organizeJpgsInSubfolder,
                 onStart: {
                     showProgressView = true
@@ -54,21 +58,79 @@ struct CopyToView: View {
                     dismiss()
                 }
             )
-            .frame(minWidth: 500, minHeight: 380)
+            .frame(minWidth: 500, minHeight: 420)
         }
     }
 }
 
 struct CopyOptionsView: View {
+    let photosToCoрy: [PhotoItem]
     let photosCount: Int
     @Binding var destinationURL: URL?
     @Binding var backupDestinationURL: URL?
     @Binding var renameByExifDate: Bool
     @Binding var customPrefix: String
     @Binding var organizeByDate: Bool
+    @Binding var organizeByCameraModel: Bool
     @Binding var organizeJpgsInSubfolder: Bool
     let onStart: () -> Void
     let onCancel: () -> Void
+
+    // Computed property to generate preview path
+    private var previewPath: String? {
+        guard let firstPhoto = photosToCoрy.first,
+              let baseURL = destinationURL else {
+            return nil
+        }
+
+        var components: [String] = [baseURL.path]
+
+        // Add date folder if enabled
+        if organizeByDate {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MM-dd"
+            let folderName = dateFormatter.string(from: firstPhoto.dateCreated)
+            components.append(folderName)
+        }
+
+        // Add camera model folder if enabled
+        if organizeByCameraModel, let cameraModel = firstPhoto.cameraModel {
+            // Clean up camera model for folder name
+            let cleanModel = cameraModel
+                .replacingOccurrences(of: "/", with: "-")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            components.append(cleanModel)
+        }
+
+        // Add _jpg folder if this would be a JPG and the option is enabled
+        let isJpg = firstPhoto.path.lowercased().hasSuffix(".jpg") ||
+                    firstPhoto.path.lowercased().hasSuffix(".jpeg")
+        if organizeJpgsInSubfolder && isJpg {
+            components.append("_jpg")
+        }
+
+        // Generate filename
+        var filename = URL(fileURLWithPath: firstPhoto.path).lastPathComponent
+        let fileExtension = URL(fileURLWithPath: firstPhoto.path).pathExtension
+
+        if renameByExifDate {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
+            let dateString = dateFormatter.string(from: firstPhoto.dateCreated)
+
+            if !customPrefix.isEmpty {
+                filename = customPrefix + dateString + "." + fileExtension
+            } else {
+                filename = dateString + "." + fileExtension
+            }
+        } else if !customPrefix.isEmpty {
+            filename = customPrefix + filename
+        }
+
+        components.append(filename)
+
+        return components.joined(separator: "/")
+    }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -181,6 +243,17 @@ struct CopyOptionsView: View {
                     }
                 }
 
+                // Organize by camera model
+                Toggle(isOn: $organizeByCameraModel) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Organize into subfolders by camera model")
+                            .font(.body)
+                        Text("Creates folders with camera model names")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
                 // Organize JPGs in subfolder
                 Toggle(isOn: $organizeJpgsInSubfolder) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -190,6 +263,26 @@ struct CopyOptionsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                }
+            }
+
+            // Preview section
+            if let preview = previewPath {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Preview (first file):")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Text(preview)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .lineLimit(3)
+                        .truncationMode(.middle)
+                        .padding(8)
+                        .background(Color(NSColor.textBackgroundColor))
+                        .cornerRadius(4)
                 }
             }
 
@@ -244,6 +337,7 @@ struct CopyProgressView: View {
     let renameByExifDate: Bool
     let customPrefix: String
     let organizeByDate: Bool
+    let organizeByCameraModel: Bool
     let organizeJpgsInSubfolder: Bool
     let onComplete: () -> Void
     let onCancel: () -> Void
@@ -393,6 +487,16 @@ struct CopyProgressView: View {
                         dateFormatter.dateFormat = "MM-dd"
                         let folderName = dateFormatter.string(from: photo.dateCreated)
                         destinationFolder = baseURL.appendingPathComponent(folderName)
+
+                        // Create subfolder if it doesn't exist
+                        try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
+                    }
+
+                    // Organize by camera model if option is enabled and we have photo metadata
+                    if organizeByCameraModel, let photo = file.photo, let cameraModel = photo.cameraModel {
+                        // Clean up camera model for folder name (replace / with -)
+                        let cleanModel = cameraModel.replacingOccurrences(of: "/", with: "-")
+                        destinationFolder = destinationFolder.appendingPathComponent(cleanModel)
 
                         // Create subfolder if it doesn't exist
                         try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
