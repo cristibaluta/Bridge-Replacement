@@ -39,6 +39,26 @@ struct FolderRowView: View {
         }
     }
 
+    // Determine the appropriate icon for this folder
+    private var folderIcon: String {
+        // Check if this is a root folder in /Volumes (external drive)
+        if isRootFolder && isVolume {
+            return "externaldrive.fill"
+        }
+
+        // Check if this is a first-level folder inside /Volumes (the actual external drive)
+        let path = folder.url.path
+        let components = path.components(separatedBy: "/").filter { !$0.isEmpty }
+
+        // If path is like /Volumes/DriveName, it's the drive itself
+        if components.count == 2 && components[0] == "Volumes" {
+            return "externaldrive.fill"
+        }
+
+        // Otherwise use regular folder icon
+        return "folder.fill"
+    }
+
     private var needsToLoadChildren: Bool {
         // Check if this folder has an empty children array (placeholder for expandable but unloaded)
         return folder.children?.isEmpty == true
@@ -118,7 +138,7 @@ struct FolderRowView: View {
                 Label {
                     Text(folder.url.lastPathComponent)
                 } icon: {
-                    Image(systemName: "folder.fill")
+                    Image(systemName: folderIcon)
                         .foregroundStyle(folderColor)
                 }
                 .tag(folder)
