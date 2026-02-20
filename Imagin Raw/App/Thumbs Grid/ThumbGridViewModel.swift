@@ -19,7 +19,7 @@ class ThumbGridViewModel: ObservableObject {
     @Published var lastSelectedIndex: Int?
     @Published var cachingQueueCount: Int = 0
     @Published var isLoadingMetadata: Bool = false
-    
+
     // Cached filtered photos to avoid recalculating on every access
     @Published private(set) var filteredPhotos: [PhotoItem] = []
 
@@ -99,11 +99,11 @@ class ThumbGridViewModel: ObservableObject {
         ThumbsManager.shared.$pendingQueueCount
             .receive(on: DispatchQueue.main)
             .assign(to: &$cachingQueueCount)
-        
+
         // Set up observers to recalculate filteredPhotos when any dependency changes
         setupFilteredPhotosObservers()
     }
-    
+
     private func setupFilteredPhotosObservers() {
         // Recalculate filteredPhotos whenever relevant properties change
         Publishers.CombineLatest4(
@@ -118,7 +118,7 @@ class ThumbGridViewModel: ObservableObject {
         }
         .store(in: &cancellables)
     }
-    
+
     private func updateFilteredPhotos() {
         var result = photos
 
@@ -180,7 +180,7 @@ class ThumbGridViewModel: ObservableObject {
 
         // Cancel any existing subscriptions
         cancellables.removeAll()
-        
+
         // Re-setup filtered photos observers after clearing cancellables
         setupFilteredPhotosObservers()
 
@@ -205,7 +205,7 @@ class ThumbGridViewModel: ObservableObject {
                 print("📡 ThumbGridViewModel.isLoadingMetadata set to: \(isLoading)")
             }
             .store(in: &cancellables)
-        
+
         // Observe PhotosModel's photos array and trigger filteredPhotos recalculation
         newPhotosModel.$photos
             .sink { [weak self] _ in
@@ -440,9 +440,18 @@ class ThumbGridViewModel: ObservableObject {
     }
 
     func getSelectedPhotosForBulkAction() -> [PhotoItem] {
+        // Always get photos from the source of truth (photosModel.photos), not from cached filteredPhotos
+        // This ensures we get the most current version of photos, even if filteredPhotos hasn't updated yet
+        guard let photos = photosModel?.photos else { return [] }
+
         if selectedPhotos.count > 1 {
-            return filteredPhotos.filter { selectedPhotos.contains($0.id) }
+            // Get current versions of all selected photos from photosModel
+            return photos.filter { selectedPhotos.contains($0.id) }
         } else if let selectedPhoto = filesModel.selectedPhoto {
+            // Get the current version of the single selected photo from photosModel
+            if let currentPhoto = photos.first(where: { $0.id == selectedPhoto.id }) {
+                return [currentPhoto]
+            }
             return [selectedPhoto]
         } else {
             return []
@@ -774,6 +783,9 @@ class ThumbGridViewModel: ObservableObject {
 
         photosModel.photos[photoIndex] = updatedPhoto
         filesModel.selectedPhoto = updatedPhoto
+
+        // Manually trigger filteredPhotos update to ensure UI reflects changes immediately
+        updateFilteredPhotos()
     }
 
     private func updatePhotoWithXmpMetadata(photo: PhotoItem, xmpMetadata: XmpMetadata) {
@@ -803,5 +815,8 @@ class ThumbGridViewModel: ObservableObject {
 
         photosModel.photos[photoIndex] = updatedPhoto
         filesModel.selectedPhoto = updatedPhoto
+
+        // Manually trigger filteredPhotos update to ensure UI reflects changes immediately
+        updateFilteredPhotos()
     }
 }
