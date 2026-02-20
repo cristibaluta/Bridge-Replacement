@@ -14,58 +14,73 @@ import SwiftUI
 final class PhotosModel: ObservableObject {
     @Published var photos: [PhotoItem] = []
     @Published var isLoadingMetadata: Bool = false
-    
+
     private let folder: FolderItem
     private var metadataTask: Task<Void, Never>?
-    
+
     init(folder: FolderItem) {
         self.folder = folder
     }
-    
+
     deinit {
         // Cancel any pending metadata loading
         metadataTask?.cancel()
-        
+
         // Stop any pending thumbnail generation
         ThumbsManager.shared.stopQueue()
-        
+
         print("🗑️ PhotosModel deallocated for: \(folder.url.lastPathComponent)")
     }
-    
+
     /// Load photos for the folder - call this when the model is created
     func loadPhotos() {
         // Load basic photo info immediately
-        photos = Self.loadPhotosBasic(in: folder)
-        
+        let basicPhotos = Self.loadPhotosBasic(in: folder)
+        photos = basicPhotos
+
+        print("📸 Loaded \(basicPhotos.count) photos (basic info) for: \(folder.url.lastPathComponent)")
+
         // Load metadata asynchronously
         isLoadingMetadata = true
+        let folderName = folder.url.lastPathComponent
+
         metadataTask = Task {
-            let photosWithMetadata = await Self.loadPhotosMetadataAsync(in: folder, photos: photos)
-            
+            print("🔄 Starting metadata loading for: \(folderName)")
+
+            let photosWithMetadata = await Self.loadPhotosMetadataAsync(in: folder, photos: basicPhotos)
+
             // Check if task was cancelled
-            guard !Task.isCancelled else { return }
-            
+            guard !Task.isCancelled else {
+                print("⚠️ Metadata loading cancelled for: \(folderName)")
+                await MainActor.run {
+                    self.isLoadingMetadata = false
+                }
+                return
+            }
+
             await MainActor.run {
+                print("📊 Updating photos with metadata for: \(folderName)")
                 self.photos = photosWithMetadata
                 self.isLoadingMetadata = false
+                print("✅ Metadata loading completed for: \(folderName)")
             }
         }
     }
-    
+
     /// Reload photos (called when folder contents change)
     func reloadPhotos() {
         // Cancel any pending metadata loading
         metadataTask?.cancel()
-        
+
         // Stop any pending thumbnail generation
         ThumbsManager.shared.stopQueue()
-        
+
         // Reload photos
         loadPhotos()
     }
-    
+
     // MARK: - Static Photo Loading Methods
-    
+
     private static func loadPhotosBasic(in folder: FolderItem) -> [PhotoItem] {
         let fm = FileManager.default
         let rawExtensions = ["arw", "orf", "rw2", "cr2", "cr3", "crw", "nef", "nrw",
@@ -141,7 +156,7 @@ final class PhotosModel: ObservableObject {
 
         return result
     }
-    
+
     private static func loadPhotosMetadataAsync(in folder: FolderItem, photos: [PhotoItem]) async -> [PhotoItem] {
         let fm = FileManager.default
         let rawExtensions = ["arw", "orf", "rw2", "cr2", "cr3", "crw", "nef", "nrw",

@@ -99,9 +99,23 @@ class ThumbGridViewModel: ObservableObject {
 
     // MARK: - Photo Loading
     func loadPhotosForFolder(_ folder: FolderItem) {
+        print("📂 Loading photos for folder: \(folder.url.lastPathComponent)")
+
+        // Cancel any existing subscriptions
+        cancellables.removeAll()
+
         // Create a new PhotosModel for this folder
         let newPhotosModel = PhotosModel(folder: folder)
         self.photosModel = newPhotosModel
+
+        print("   Old PhotosModel will be deallocated")
+
+        // Set up subscriptions to observe the new PhotosModel's changes
+        newPhotosModel.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
 
         // Load photos
         newPhotosModel.loadPhotos()
@@ -112,6 +126,7 @@ class ThumbGridViewModel: ObservableObject {
     }
 
     func reloadPhotos() {
+        print("🔄 Reloading photos")
         photosModel?.reloadPhotos()
     }
 
