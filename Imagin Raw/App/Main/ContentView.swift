@@ -26,7 +26,6 @@ struct ContentView: View {
     @State private var showFolderPopover = false
     @State private var isSidebarCollapsed = false
     @State private var openSelectedPhotosCallback: (() -> Void)?
-    @State private var isReviewModeActive = false
     @State private var contentColumnWidth: CGFloat = 450
 
 
@@ -93,49 +92,7 @@ struct ContentView: View {
                         .preferredColorScheme(.dark)
                         .focusable()
                         .focusEffectDisabled()
-                        .onKeyPress { keyPress in
-                            handleKeyPress(keyPress)
-                        }
-                        .onChange(of: isReviewModeActive) { _, newValue in
-                            // Hide/show navigation elements based on review mode state
-                            DispatchQueue.main.async {
-                                if let window = NSApplication.shared.keyWindow {
-                                    if newValue {
-                                        // Entering review mode - hide navigation
-                                        window.titlebarAppearsTransparent = true
-                                        window.titleVisibility = .hidden
-                                        window.toolbar?.isVisible = false
-                                    } else {
-                                        // Exiting review mode - show navigation
-                                        window.titlebarAppearsTransparent = false
-                                        window.titleVisibility = .visible
-                                        window.toolbar?.isVisible = true
-                                    }
-                                }
-                            }
-                        }
                 }
-            }
-
-            // Full-screen review mode overlay
-            if isReviewModeActive {
-                ReviewModeView(
-                    photos: filesModel.photos.filter { photo in
-                        // Apply same filtering logic as ThumbGridView
-                        return true // For now, use all photos - we'll need to get filtered photos from ThumbGridView
-                    },
-                    selectedPhoto: $filesModel.selectedPhoto,
-                    onExit: {
-                        isReviewModeActive = false
-                    },
-                    onUpdatePhoto: { photo, xmpMetadata in
-                        updatePhotoWithXmpMetadata(photo: photo, xmpMetadata: xmpMetadata)
-                    },
-                    onToggleDelete: { photo in
-                        toggleToDeleteState(for: photo)
-                    }
-                )
-                .zIndex(1000)
             }
         }
     }
@@ -172,7 +129,7 @@ struct ContentView: View {
                     openMultiplePhotosInExternalApp(photos: photos)
                 },
                 onEnterReviewMode: {
-                    isReviewModeActive = true
+
                 }
             )
             .onPreferenceChange(GridWidthPreferenceKey.self) { width in
@@ -252,7 +209,7 @@ struct ContentView: View {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.up.forward.app")
                     .font(.system(size: 12, weight: .regular))
-                Text(selectedApp?.displayName ?? "Default App")
+                Text("Open in \(selectedApp?.displayName ?? "Default App")")
             }
             .foregroundColor(filesModel.selectedPhoto != nil ? .primary : .secondary)
         }
@@ -352,50 +309,6 @@ struct ContentView: View {
         }
     }
 
-    private func openWithDiscoveredApp(photo: PhotoItem, app: PhotoApp) {
-        let url = URL(fileURLWithPath: photo.path)
-        let workspace = NSWorkspace.shared
-
-        do {
-            try workspace.open([url], withApplicationAt: app.url, options: [], configuration: [:])
-        } catch {
-            // Fallback to default application
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func openWithSpecificApp(url: URL, app: ExternalApp) -> Bool {
-        let workspace = NSWorkspace.shared
-
-        // Try to find the application bundle
-        guard let appURL = workspace.urlForApplication(withBundleIdentifier: app.bundleID) else {
-            return false
-        }
-
-        do {
-            try workspace.open([url], withApplicationAt: appURL, options: [], configuration: [:])
-            return true
-        } catch {
-            return false
-        }
-    }
-
-    // MARK: - Review Mode Helper Methods
-
-    private func handleKeyPress(_ keyPress: KeyPress) -> KeyPress.Result {
-        switch keyPress.key {
-        case .space:
-            // Enter review mode if a photo is selected
-            if filesModel.selectedPhoto != nil && !filesModel.photos.isEmpty {
-                isReviewModeActive = true
-                return .handled
-            }
-            return .ignored
-        default:
-            return .ignored
-        }
-    }
-
     private func updatePhotoWithXmpMetadata(photo: PhotoItem, xmpMetadata: XmpMetadata) {
         // Find the current photo index in the filesModel's photos array
         if let photoIndex = filesModel.photos.firstIndex(where: { $0.path == photo.path }) {
@@ -425,69 +338,6 @@ struct ContentView: View {
             // Update selectedPhoto to point to the new updated photo instance (same photo, just updated)
             filesModel.selectedPhoto = updatedPhoto
 
-        } else {
-        }
-    }
-
-    private func toggleToDeleteState(for photo: PhotoItem) {
-        // Find the current photo index in the filesModel's photos array
-        if let photoIndex = filesModel.photos.firstIndex(where: { $0.path == photo.path }) {
-            let currentPhoto = filesModel.photos[photoIndex]
-
-            // Create a new PhotoItem with toggled toDelete state, preserving all other properties
-            let updatedPhoto = PhotoItem(
-                id: currentPhoto.id,
-                path: currentPhoto.path,
-                xmp: currentPhoto.xmp,
-                dateCreated: currentPhoto.dateCreated,
-                toDelete: !currentPhoto.toDelete,
-                hasACR: currentPhoto.hasACR,
-                hasJPG: currentPhoto.hasJPG,
-                inCameraRating: currentPhoto.inCameraRating,
-                isRawFile: currentPhoto.isRawFile,
-                fileSizeBytes: currentPhoto.fileSizeBytes,
-                width: currentPhoto.width,
-                height: currentPhoto.height,
-                cameraMake: currentPhoto.cameraMake,
-                cameraModel: currentPhoto.cameraModel
-            )
-
-            // Update the photos array directly
-            filesModel.photos[photoIndex] = updatedPhoto
-
-            // Always update selectedPhoto to point to the new updated photo instance (same photo, just updated)
-            filesModel.selectedPhoto = updatedPhoto
-
-            let action = updatedPhoto.toDelete ? "Marked" : "Unmarked"
-        } else {
-        }
-    }
-
-    // MARK: - Grid Type Persistence
-
-}
-
-enum ExternalApp: CaseIterable {
-    case photoshop
-    case lightroom
-    case dxo
-    case defaultApp
-
-    var displayName: String {
-        switch self {
-        case .photoshop: return "Adobe Photoshop"
-        case .lightroom: return "Adobe Lightroom"
-        case .dxo: return "DxO PhotoLab"
-        case .defaultApp: return "Default App"
-        }
-    }
-
-    var bundleID: String {
-        switch self {
-        case .photoshop: return "com.adobe.Photoshop"
-        case .lightroom: return "com.adobe.LightroomCC"
-        case .dxo: return "com.dxo.PhotoLab7" // May vary by version
-        case .defaultApp: return "" // Not used for default
         }
     }
 }
