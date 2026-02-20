@@ -19,6 +19,9 @@ class ThumbGridViewModel: ObservableObject {
     @Published var lastSelectedIndex: Int?
     @Published var cachingQueueCount: Int = 0
     @Published var isLoadingMetadata: Bool = false
+    
+    // Cached filtered photos to avoid recalculating on every access
+    @Published private(set) var filteredPhotos: [PhotoItem] = []
 
     @Published var photosToCopy: [PhotoItem] = []
     @Published var copyDestinationURL: URL?
@@ -96,56 +99,27 @@ class ThumbGridViewModel: ObservableObject {
         ThumbsManager.shared.$pendingQueueCount
             .receive(on: DispatchQueue.main)
             .assign(to: &$cachingQueueCount)
+        
+        // Set up observers to recalculate filteredPhotos when any dependency changes
+        setupFilteredPhotosObservers()
     }
-
-    // MARK: - Photo Loading
-    func loadPhotosForFolder(_ folder: FolderItem) {
-        print("📂 Loading photos for folder: \(folder.url.lastPathComponent)")
-
-        // Cancel any existing subscriptions
-        cancellables.removeAll()
-
-        // Create a new PhotosModel for this folder
-        let newPhotosModel = PhotosModel(folder: folder)
-        self.photosModel = newPhotosModel
-
-        print("   Old PhotosModel will be deallocated")
-
-        // Set up subscriptions to observe the new PhotosModel's changes
-        newPhotosModel.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        // Observe PhotosModel's isLoadingMetadata and update our published property
-        newPhotosModel.$isLoadingMetadata
-            .sink { [weak self] isLoading in
-                print("📡 PhotosModel.isLoadingMetadata changed to: \(isLoading)")
-                self?.isLoadingMetadata = isLoading
-                print("📡 ThumbGridViewModel.isLoadingMetadata set to: \(isLoading)")
-            }
-            .store(in: &cancellables)
-
-        // Load photos
-        newPhotosModel.loadPhotos()
-
-        // Clear selection when loading new folder
-        selectedPhotos.removeAll()
-        lastSelectedIndex = nil
+    
+    private func setupFilteredPhotosObservers() {
+        // Recalculate filteredPhotos whenever relevant properties change
+        Publishers.CombineLatest4(
+            $selectedLabels,
+            $selectedRatings,
+            $sortOption,
+            $isLoadingMetadata
+        )
+        .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
+        .sink { [weak self] _ in
+            self?.updateFilteredPhotos()
+        }
+        .store(in: &cancellables)
     }
-
-    func reloadPhotos() {
-        print("🔄 Reloading photos")
-        photosModel?.reloadPhotos()
-    }
-
-    // MARK: - Computed Properties
-    var photos: [PhotoItem] {
-        return photosModel?.photos ?? []
-    }
-
-    var filteredPhotos: [PhotoItem] {
+    
+    private func updateFilteredPhotos() {
         var result = photos
 
         // If metadata is still loading, show all photos (don't apply filters yet)
@@ -197,7 +171,64 @@ class ThumbGridViewModel: ObservableObject {
             }
         }
 
-        return result
+        filteredPhotos = result
+    }
+
+    // MARK: - Photo Loading
+    func loadPhotosForFolder(_ folder: FolderItem) {
+        print("📂 Loading photos for folder: \(folder.url.lastPathComponent)")
+
+        // Cancel any existing subscriptions
+        cancellables.removeAll()
+        
+        // Re-setup filtered photos observers after clearing cancellables
+        setupFilteredPhotosObservers()
+
+        // Create a new PhotosModel for this folder
+        let newPhotosModel = PhotosModel(folder: folder)
+        self.photosModel = newPhotosModel
+
+        print("   Old PhotosModel will be deallocated")
+
+        // Set up subscriptions to observe the new PhotosModel's changes
+        newPhotosModel.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        // Observe PhotosModel's isLoadingMetadata and update our published property
+        newPhotosModel.$isLoadingMetadata
+            .sink { [weak self] isLoading in
+                print("📡 PhotosModel.isLoadingMetadata changed to: \(isLoading)")
+                self?.isLoadingMetadata = isLoading
+                print("📡 ThumbGridViewModel.isLoadingMetadata set to: \(isLoading)")
+            }
+            .store(in: &cancellables)
+        
+        // Observe PhotosModel's photos array and trigger filteredPhotos recalculation
+        newPhotosModel.$photos
+            .sink { [weak self] _ in
+                self?.updateFilteredPhotos()
+            }
+            .store(in: &cancellables)
+
+        // Load photos
+        newPhotosModel.loadPhotos()
+
+        // Clear selection when loading new folder
+        selectedPhotos.removeAll()
+        lastSelectedIndex = nil
+    }
+
+    func reloadPhotos() {
+        print("🔄 Reloading photos")
+        photosModel?.reloadPhotos()
+    }
+
+    // MARK: - Computed Properties
+    var photos: [PhotoItem] {
+        return photosModel?.photos ?? []
     }
 
     var availableLabels: [String] {
