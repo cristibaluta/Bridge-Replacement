@@ -159,6 +159,12 @@ class ThumbGridViewModel: ObservableObject {
             }
         }
 
+        if !photos.isEmpty && result.isEmpty {
+            selectedLabels.removeAll()
+            selectedRatings.removeAll()
+            result = photos
+        }
+
         // Apply sorting
         switch sortOption {
         case .name:
@@ -175,7 +181,6 @@ class ThumbGridViewModel: ObservableObject {
 
         filteredPhotos = result
         self.lastSelectedIndex = filteredPhotos.firstIndex(where: { $0.id == lastSelectedPhotoId })
-        print(self.lastSelectedIndex)
     }
 
     // MARK: - Photo Loading
