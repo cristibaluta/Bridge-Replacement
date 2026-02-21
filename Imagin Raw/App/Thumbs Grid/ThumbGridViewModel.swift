@@ -118,9 +118,11 @@ class ThumbGridViewModel: ObservableObject {
         }
         .store(in: &cancellables)
     }
-
+// TODO this is called too often, when i just label a photo
     private func updateFilteredPhotos() {
         var result = photos
+        let lastSelectedIndex = self.lastSelectedIndex
+        let lastSelectedPhotoId = lastSelectedIndex != nil ? filteredPhotos[lastSelectedIndex!].id : nil
 
         // If metadata is still loading, show all photos (don't apply filters yet)
         // This prevents showing an empty view while waiting for metadata
@@ -172,6 +174,8 @@ class ThumbGridViewModel: ObservableObject {
         }
 
         filteredPhotos = result
+        self.lastSelectedIndex = filteredPhotos.firstIndex(where: { $0.id == lastSelectedPhotoId })
+        print(self.lastSelectedIndex)
     }
 
     // MARK: - Photo Loading
@@ -302,6 +306,9 @@ class ThumbGridViewModel: ObservableObject {
             let endIndex = max(lastSelectedIndex, photoIndex)
 
             for index in startIndex...endIndex {
+                if index >= filteredPhotos.count {
+                    break
+                }
                 selectedPhotos.insert(filteredPhotos[index].id)
             }
             filesModel.selectedPhoto = photo

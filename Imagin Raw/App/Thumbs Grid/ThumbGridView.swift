@@ -257,7 +257,9 @@ struct ThumbGridView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .popover(isPresented: $showFilterPopover) {
-                    FilterPopoverView(selectedLabels: $viewModel.selectedLabels, selectedRatings: $viewModel.selectedRatings, photos: viewModel.photos)
+                    FilterPopoverView(selectedLabels: $viewModel.selectedLabels,
+                                      selectedRatings: $viewModel.selectedRatings,
+                                      photos: viewModel.photos)
                 }
 
                 ForEach(viewModel.availableLabels, id: \.self) { label in
@@ -272,6 +274,7 @@ struct ThumbGridView: View {
                     .help(label)
                 }
 
+                // TODO show this only if there are starred photos
                 if true {
                     Button(action: {
                         if viewModel.selectedRatings.isEmpty {
