@@ -130,7 +130,8 @@ struct ContentView: View {
                 },
                 onEnterReviewMode: {
 
-                }
+                },
+                openSelectedPhotosCallback: $openSelectedPhotosCallback
             )
             .onPreferenceChange(GridWidthPreferenceKey.self) { width in
                 contentColumnWidth = width
@@ -140,15 +141,6 @@ struct ContentView: View {
                 ideal: contentColumnWidth,
                 max: contentColumnWidth
             )
-            .onAppear {
-                // Set up the callback for the toolbar button
-                openSelectedPhotosCallback = {
-                    if let selectedPhoto = filesModel.selectedPhoto {
-                        // Open the selected photo
-                        openInExternalApp(photo: selectedPhoto)
-                    }
-                }
-            }
         } detail: {
             detailView
             .navigationSplitViewColumnWidth(min: 400, ideal: 600)

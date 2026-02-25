@@ -16,16 +16,20 @@ struct ThumbGridView: View {
     let onOpenSelectedPhotos: (([PhotoItem]) -> Void)?
     let onEnterReviewMode: (() -> Void)?
     @FocusState private var isFocused: Bool
+    @Binding var openSelectedPhotosCallback: (() -> Void)?
+
     @State private var showFilterPopover = false
     @State private var showSortPopover = false
     @State private var showGridTypePopover = false
     @State private var showCopyToSheet = false
 
-    init(filesModel: FilesModel, selectedApp: PhotoApp?, onOpenSelectedPhotos: (([PhotoItem]) -> Void)?, onEnterReviewMode: (() -> Void)?) {
+    init(filesModel: FilesModel, selectedApp: PhotoApp?, onOpenSelectedPhotos: (([PhotoItem]) -> Void)?, onEnterReviewMode: (() -> Void)?, openSelectedPhotosCallback: Binding<(() -> Void)?>) {
         self._viewModel = StateObject(wrappedValue: ThumbGridViewModel(filesModel: filesModel))
         self.selectedApp = selectedApp
         self.onOpenSelectedPhotos = onOpenSelectedPhotos
         self.onEnterReviewMode = onEnterReviewMode
+        self._openSelectedPhotosCallback = openSelectedPhotosCallback
+
     }
 
     var body: some View {
@@ -54,6 +58,12 @@ struct ThumbGridView: View {
         }
         .onAppear {
             // Load photos for the selected folder when view first appears
+            
+            // Set up the callback for the toolbar button to open all selected photos
+            openSelectedPhotosCallback = { [viewModel] in
+                let selectedPhotoItems = viewModel.getSelectedPhotosForBulkAction()
+                onOpenSelectedPhotos?(selectedPhotoItems)
+            }
             if let folder = filesModel.selectedFolder {
                 viewModel.loadPhotosForFolder(folder)
             }
